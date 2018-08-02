@@ -1,5 +1,4 @@
-# IPFS-Manager
-Download, install, manage, debug your IPFS node
+![](https://i.imgur.com/NDoFMtN.png)
 
 ### Features
 
