@@ -5,7 +5,7 @@ Download, install, manage, debug your IPFS node
 
 - Supports all IPFS actions
 
-- Automatically downloods go-ipfs
+- Automatically downloads go-ipfs
 
 - Can connect to an already running IPFS node
 
