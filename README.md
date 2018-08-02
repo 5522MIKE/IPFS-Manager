@@ -32,6 +32,8 @@
 
 - [OpenJFX (JavaFX)](https://wiki.openjdk.java.net/display/OpenJFX/Main)
 
+- [Launch4J](http://launch4j.sourceforge.net/)
+
 - [Go-IPFS](https://github.com/ipfs/go-ipfs)
 
 - [Kotlin](https://kotlinlang.org/)
