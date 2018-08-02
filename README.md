@@ -23,3 +23,21 @@
 - [Windows](https://github.com/RHazDev/IPFS-Manager/releases/download/1.0/ipfs-manager-1.0.exe)
 
 - [Linux, MacOS, Freebsd](https://github.com/RHazDev/IPFS-Manager/releases/download/1.0/ipfs-manager-1.0.jar)
+
+### This app is built with the help of
+
+- [IPFS-Daemon](https://github.com/RHazDev/IPFS-Daemon)
+
+- [IPFS-API-Kotlin](https://github.com/ligi/ipfs-api-kotlin)
+
+- [OpenJFX (JavaFX)](https://wiki.openjdk.java.net/display/OpenJFX/Main)
+
+- [Go-IPFS](https://github.com/ipfs/go-ipfs)
+
+- [Kotlin](https://kotlinlang.org/)
+
+- [Gradle](https://gradle.org/)
+
+- [IntelliJ IDEA](https://www.jetbrains.com/idea/)
+
+
