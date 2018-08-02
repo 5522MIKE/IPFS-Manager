@@ -1,4 +1,5 @@
-![](https://i.imgur.com/ecMERn6.png)
+![](https://i.imgur.com/h1fInRb.png)
+> Download, install, manage, debug your IPFS node
 
 ### Features
 
