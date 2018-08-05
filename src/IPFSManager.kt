@@ -17,7 +17,6 @@ import javafx.scene.layout.BorderPane
 import javafx.scene.layout.HBox
 import javafx.scene.layout.StackPane
 import javafx.scene.text.Font
-import javafx.scene.text.Text
 import javafx.stage.Stage
 import javafx.stage.StageStyle
 import javafx.stage.WindowEvent
@@ -27,15 +26,19 @@ import java.awt.PopupMenu
 import java.awt.SystemTray
 import java.awt.TrayIcon
 import java.awt.event.ActionListener
+import java.io.File
+import java.net.URLClassLoader
 import javax.imageio.ImageIO
 
 fun main(args: Array<String>) {
     Application.launch(IPFSManager::class.java, *args)
 }
 
+lateinit var manager: IPFSManager;
 class IPFSManager : Application() {
 
     override fun start(stage: Stage) {
+        manager = this;
         window = stage
         window.apply(Window).apply { show() }
     }
@@ -132,7 +135,7 @@ class IPFSManager : Application() {
         }
     }
 
-    var ipfs: IPFS? = null
+    var ipfs = IPFS()
 
     lateinit var status: Label;
     val Content: StackPane by lazy {
@@ -146,31 +149,26 @@ class IPFSManager : Application() {
                 translateY = -30.0
             }.also { children.add(it); }
 
-            val callback: () -> Unit = here@{
+            val error: () -> Unit = here@{
 
-                val ipfs = ipfs ?: return@here {
+                status.text = "Could not connect"
 
-                    status.text = "Could not connect"
+                Button("Start Daemon").apply {
+                    translateY = 20.0
+                    style = "-fx-background-color: white";
+                    setOnAction {
+                        isVisible = false
+                        start()
+                    }
+                }.also { children.add(it) }
 
-                    Button("Start Daemon").apply {
-                        translateY = 20.0
-                        style = "-fx-background-color: white";
-                        setOnAction {
-                            isVisible = false
-                            start()
-                        }
-                    }.also { children.add(it) }
-                }()
-
-                console();
             }
 
             ipfsd.listeners.onDownloaded.add(Runnable {
-                async(3, {ipfs = IPFS().takeIf{it.info.version() != null}}, callback)
+                async(3, {ipfs.info.version()}, {console()}, error)
             })
 
             download();
-
 
         }
     }
@@ -193,6 +191,7 @@ class IPFSManager : Application() {
                 if(msg == "ipfs: Reading from /dev/stdin; send Ctrl-z to stop.") {
                     process.destroy()
                     log?.append("IPFS Manager: Please specify arguments")
+                    return@here
                 }
 
                 Platform.runLater { log?.append(msg) }
@@ -204,12 +203,7 @@ class IPFSManager : Application() {
     fun start() = Thread{ipfsd.start(true)}.apply{start()}
     fun process(vararg args: String) = ipfsd.process(*args).also { ipfsd.gobble(it) }
 
-    var log: TextArea? = null;
-    fun TextArea.append(msg: String){
-        text += "\n$msg"
-        layout()
-        scrollTop = Double.MAX_VALUE
-    }
+    var log = TextArea();
     fun console(){
         status.text = "Connected"
 
@@ -219,14 +213,13 @@ class IPFSManager : Application() {
             play();
         }
 
-        val log = TextArea().apply {
+        log.apply {
             text = "Connected! Type something"
             style = "-fx-background-color: transparent; -fx-background-insets: 0px";
             padding = Insets(0.0, 16.0, 32.0, 16.0)
             isEditable = false
             background = Background.EMPTY
         }.also { Content.children.add(it) }
-        this@IPFSManager.log = log;
 
         TextField().apply {
             translateY = 160.0
@@ -238,28 +231,79 @@ class IPFSManager : Application() {
                     log.text += "\n>$text"
                     log.layout()
                     log.scrollTop = Double.MAX_VALUE
-                    process(*text.split(" ").toTypedArray())
+                    plugins.filterKeys{text.startsWith(it, true)}.values.mapNotNull{it as? Task}.firstOrNull()?.onCall(text)
+                        ?: process(*text.split(" ").toTypedArray())
                 }
             }
         }.also { Content.children.add(it) }
+
+        loadAll().values.apply{
+            forEach {it.log = log}
+            forEach(KScript::onEnabled)
+        }
     }
 
 }
 
-fun async(timeout: Int, runnable: () -> Unit, callback: () -> Unit) = Thread(runnable).apply { tasker(timeout, callback) }
+fun TextArea.append(msg: String){
+    text += "\n$msg"
+    layout()
+    scrollTop = Double.MAX_VALUE
+}
 
-fun Thread.tasker(timeout: Int, callback: () -> Unit) = {
+fun async(timeout: Int, runnable: () -> Unit, success: () -> Unit, error: () -> Unit) =
+        Thread(runnable).apply{tasker(timeout, success, error) }
+
+fun Thread.tasker(timeout: Int, success: () -> Unit, error: () -> Unit) = {
     start()
     val start = System.currentTimeMillis()
     while (this.isAlive) {
         Thread.sleep(1000)
-        if (System.currentTimeMillis() - start > (timeout * 1000))
-            interrupt()
+        if (System.currentTimeMillis() - start > (timeout * 1000)){
+            Platform.runLater(error); break
+        }
     }
-    Platform.runLater(callback)
+    Platform.runLater(success)
 }.let { Thread(it).start() }
 
 fun wait(timeout: Long, callback: () -> Unit) = {
     Thread.sleep(timeout)
     Platform.runLater { callback() }
 }.let { Thread(it).start() }
+
+val dfolder = File("scripts")
+
+var plugins = emptyMap<String, KScript>()
+
+fun loadAll(folder: File = dfolder): Map<String, KScript> {
+    if(!folder.exists()) return emptyMap()
+    plugins = folder.listFiles().mapNotNull(::load).associateBy{it.name}
+    return plugins;
+}
+
+fun load(file: File): KScript? {
+    try {
+        val urls = arrayOf(file.parentFile.toURI().toURL())
+        val loader = URLClassLoader(urls)
+        val cls = loader.loadClass(file.nameWithoutExtension)
+        val obj = cls.newInstance()
+        if(obj is KScript) return obj;
+        return cls.getMethod("main").invoke(obj) as? KScript
+    }catch (ex: Exception){
+        ex.printStackTrace();
+        return null
+    }
+}
+
+fun unloadAll() = plugins.values.forEach(KScript::onDisabled)
+
+open class KScript(val name: String) {
+    val ipfs = manager.ipfs
+    lateinit var log: TextArea;
+    open fun onEnabled(){}
+    open fun onDisabled(){}
+}
+
+abstract class Task(name: String): KScript(name){
+    abstract fun onCall(line: String)
+}
