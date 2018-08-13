@@ -6,19 +6,18 @@ import javafx.application.Application
 import javafx.application.Platform
 import javafx.event.EventHandler
 import javafx.geometry.Insets
+import javafx.geometry.Pos
 import javafx.scene.Scene
 import javafx.scene.control.Button
 import javafx.scene.control.Label
 import javafx.scene.control.TextArea
 import javafx.scene.control.TextField
 import javafx.scene.image.Image
-import javafx.scene.layout.Background
-import javafx.scene.layout.BorderPane
-import javafx.scene.layout.HBox
-import javafx.scene.layout.StackPane
+import javafx.scene.input.TransferMode
+import javafx.scene.layout.*
 import javafx.scene.text.Font
+import javafx.stage.Modality
 import javafx.stage.Stage
-import javafx.stage.StageStyle
 import javafx.stage.WindowEvent
 import javafx.util.Duration
 import java.awt.MenuItem
@@ -34,16 +33,17 @@ fun main(args: Array<String>) {
     Application.launch(IPFSManager::class.java, *args)
 }
 
-lateinit var manager: IPFSManager;
+lateinit var manager: IPFSManager
+
 class IPFSManager : Application() {
 
     override fun start(stage: Stage) {
-        manager = this;
+        manager = this
         window = stage
-        window.apply(Window).apply { show() }
+        window.apply(Window).apply{show()}
     }
 
-    lateinit var window: Stage;
+    lateinit var window: Stage
 
     val icon
         get() = IPFSManager::class.java.classLoader.getResourceAsStream("icon.png")
@@ -52,11 +52,10 @@ class IPFSManager : Application() {
         get() = IPFSManager::class.java.classLoader.getResource("style.css").toExternalForm()
 
     val Window: Stage.() -> Unit = {
-        Platform.setImplicitExit(false);
-        tray();
+        Platform.setImplicitExit(false)
+        tray()
         icons.add(Image(icon))
         title = "IPFS Manager"
-        initStyle(StageStyle.UNDECORATED);
         minWidth = 600.0
         minHeight = 400.0
         scene = Scene(Body, minWidth, minHeight).apply {
@@ -66,7 +65,7 @@ class IPFSManager : Application() {
 
     fun tray() {
 
-        if(!SystemTray.isSupported()) return;
+        if(!SystemTray.isSupported()) return
         val tray = SystemTray.getSystemTray()
 
         val close = ActionListener { System.exit(0) }
@@ -88,64 +87,39 @@ class IPFSManager : Application() {
         TrayIcon(icon, "IPFS Manager", popup).apply {
             addActionListener(show)
             isImageAutoSize = true
-            tray.add(this);
+            tray.add(this)
         }
 
         window.onCloseRequest = EventHandler<WindowEvent> {
-            if(!SystemTray.isSupported()) System.exit(0);
-            window.hide();
+            if(!SystemTray.isSupported()) System.exit(0)
+            window.hide()
         }
     }
 
     val Body: BorderPane by lazy {
         BorderPane().apply {
             top = Top
-            center = Content
+            center = content
         }
     }
 
     val Top: HBox by lazy {
         HBox().apply {
 
-            Label("IPFS Manager").apply {
-                padding = Insets(16.0, 16.0, 16.0, 16.0)
-            }.also { children.add(it); }
-
-            var x = 0 ; var y = 0
-            setOnMousePressed {
-                x = it.sceneX.toInt();
-                y = it.sceneY.toInt();
-            }
-            setOnMouseDragged {
-                window.x = it.screenX - x
-                window.y = it.screenY - y
-            }
-
-            Label("—").apply {
-                translateX = 400.0
-                padding = Insets(16.0, 0.0, 16.0, 0.0)
-                setOnMouseClicked { window.isIconified = true }
-            }.also { children.add(it); }
-
-            Label("X").apply {
-                translateX = 430.0
-                padding = Insets(16.0, 0.0, 16.0, 0.0)
-                setOnMouseClicked { window.hide() }
-            }.also { children.add(it); }
         }
     }
 
     var ipfs = IPFS()
 
-    lateinit var status: Label;
-    val Content: StackPane by lazy {
+    lateinit var status: Label
+    val content: StackPane by lazy {
         StackPane().apply {
 
-            requestFocus();
+            requestFocus()
             setOnMouseClicked { requestFocus() }
 
             status = Label("Loading...").apply {
-                font = Font.font(30.0);
+                font = Font.font(30.0)
                 translateY = -30.0
             }.also { children.add(it); }
 
@@ -155,7 +129,7 @@ class IPFSManager : Application() {
 
                 Button("Start Daemon").apply {
                     translateY = 20.0
-                    style = "-fx-background-color: white";
+                    style = "-fx-background-color: white"
                     setOnAction {
                         isVisible = false
                         start()
@@ -168,7 +142,7 @@ class IPFSManager : Application() {
                 async(3, {ipfs.info.version()}, {console()}, error)
             })
 
-            download();
+            download()
 
         }
     }
@@ -190,11 +164,11 @@ class IPFSManager : Application() {
 
                 if(msg == "ipfs: Reading from /dev/stdin; send Ctrl-z to stop.") {
                     process.destroy()
-                    log?.append("IPFS Manager: Please specify arguments")
+                    log.append("IPFS Manager: Please specify arguments")
                     return@here
                 }
 
-                Platform.runLater { log?.append(msg) }
+                Platform.runLater { log.append(msg) }
             }
         }
     }
@@ -203,28 +177,35 @@ class IPFSManager : Application() {
     fun start() = Thread{ipfsd.start(true)}.apply{start()}
     fun process(vararg args: String) = ipfsd.process(*args).also { ipfsd.gobble(it) }
 
-    var log = TextArea();
+    var log = TextArea()
     fun console(){
         status.text = "Connected"
+
+        content.setOnDragOver { it.acceptTransferModes(*TransferMode.ANY); }
+        content.setOnDragDropped here@{
+            val drag = it.dragboard
+            if(!drag.hasFiles()) return@here
+            open(drag.files.singleOrNull() ?: return@here);
+        }
 
         FadeTransition(Duration(2000.0), status).apply {
             fromValue = 1.0
             toValue = 0.0
-            play();
+            play()
         }
 
         log.apply {
             text = "Connected! Type something"
-            style = "-fx-background-color: transparent; -fx-background-insets: 0px";
-            padding = Insets(0.0, 16.0, 32.0, 16.0)
+            style = "-fx-background-color: transparent; -fx-background-insets: 0px"
+            padding = Insets(16.0, 16.0, 32.0, 16.0)
             isEditable = false
             background = Background.EMPTY
-        }.also { Content.children.add(it) }
+        }.also { content.children.add(it) }
 
         TextField().apply {
-            translateY = 160.0
-            padding = Insets(0.0, 16.0, 16.0, 16.0)
-            style = "-fx-background-color: transparent";
+            translateY = 180.0
+            padding = Insets(16.0)
+            style = "-fx-background-color: transparent"
             promptText = "name publish Qm..."
             setOnAction {
                 text = "".also{_->
@@ -235,11 +216,56 @@ class IPFSManager : Application() {
                         ?: process(*text.split(" ").toTypedArray())
                 }
             }
-        }.also { Content.children.add(it) }
+        }.also { content.children.add(it) }
 
         loadAll().values.apply{
             forEach {it.log = log}
             forEach(KScript::onEnabled)
+        }
+    }
+
+    val open: (File) -> Unit = content@{ file ->
+        val hash = ipfs.add.file(file, file.nameWithoutExtension, file.name)
+        dialog(file.name, """
+            ${hash.Hash}
+
+            http://ipfs.io/ipfs/${hash.Hash}
+
+            ipfs://${hash.Hash}
+
+            https://ipfs.io/docs/examples/qr-render/qr#${hash.Hash}
+        """.trimIndent());
+    }
+
+    val dialog: (title: String, msg: String) -> Unit = { title, msg ->
+
+        val dialog = Stage()
+
+        val vbox = VBox().apply {
+            alignment = Pos.CENTER
+            padding = Insets(15.0)
+
+            TextArea(msg).apply {
+                style = "-fx-background-color: transparent; -fx-background-insets: 0px"
+                padding = Insets(0.0, 0.0, 16.0, 0.0)
+                isWrapText = true
+                isEditable = false
+                background = Background.EMPTY
+            }.also {children.add(it)}
+
+            Button("Close").apply {
+                style = "-fx-background-color: white"
+                setOnAction { dialog.close() }
+            }.also {children.add(it) }
+        }
+
+        dialog.apply {
+            icons.add(Image(icon))
+            this.title = title
+            isAlwaysOnTop = true
+            initModality(Modality.WINDOW_MODAL)
+            scene = Scene(vbox)
+            show()
         }
     }
 
@@ -251,20 +277,24 @@ fun TextArea.append(msg: String){
     scrollTop = Double.MAX_VALUE
 }
 
-fun async(timeout: Int, runnable: () -> Unit, success: () -> Unit, error: () -> Unit) =
-        Thread(runnable).apply{tasker(timeout, success, error) }
+fun async(timeout: Int, runnable: () -> Any?, success: () -> Unit, error: () -> Unit) = Thread{
+    try {
+        if (runnable() != null)
+            Platform.runLater(success)
+        else Platform.runLater(error)
+    }catch(ex: Exception) {Platform.runLater(error)}
+}.apply{tasker(timeout, error)}
 
-fun Thread.tasker(timeout: Int, success: () -> Unit, error: () -> Unit) = {
+fun Thread.tasker(timeout: Int, error: () -> Unit) = {
     start()
     val start = System.currentTimeMillis()
     while (this.isAlive) {
         Thread.sleep(1000)
         if (System.currentTimeMillis() - start > (timeout * 1000)){
-            Platform.runLater(error); break
+            interrupt(); Platform.runLater(error); break
         }
     }
-    Platform.runLater(success)
-}.let { Thread(it).start() }
+}.let {Thread(it).start()}
 
 fun wait(timeout: Long, callback: () -> Unit) = {
     Thread.sleep(timeout)
@@ -278,7 +308,7 @@ var plugins = emptyMap<String, KScript>()
 fun loadAll(folder: File = dfolder): Map<String, KScript> {
     if(!folder.exists()) return emptyMap()
     plugins = folder.listFiles().mapNotNull(::load).associateBy{it.name}
-    return plugins;
+    return plugins
 }
 
 fun load(file: File): KScript? {
@@ -287,10 +317,10 @@ fun load(file: File): KScript? {
         val loader = URLClassLoader(urls)
         val cls = loader.loadClass(file.nameWithoutExtension)
         val obj = cls.newInstance()
-        if(obj is KScript) return obj;
+        if(obj is KScript) return obj
         return cls.getMethod("main").invoke(obj) as? KScript
     }catch (ex: Exception){
-        ex.printStackTrace();
+        ex.printStackTrace()
         return null
     }
 }
@@ -299,7 +329,7 @@ fun unloadAll() = plugins.values.forEach(KScript::onDisabled)
 
 open class KScript(val name: String) {
     val ipfs = manager.ipfs
-    lateinit var log: TextArea;
+    lateinit var log: TextArea
     open fun onEnabled(){}
     open fun onDisabled(){}
 }

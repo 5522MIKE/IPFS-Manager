@@ -1,5 +1,18 @@
-![](https://i.imgur.com/h1fInRb.png)
-> Download, install, manage, debug your IPFS node
+<h2 align="center">
+    <img src="https://i.imgur.com/h1fInRb.png"/>
+    <br>
+    :earth_africa: Download, install, manage, debug your IPFS node :earth_africa:
+    <br>
+    <br>
+</h2>
+
+<p align="center">
+  <a href="#features">Features</a> ♦
+  <a href="#download">Download</a> ♦
+  <a href="#screenshots">Screenshots</a> ♦
+  <a href="#scripting">Scripting</a>
+</p>
+<h2></h2>
 
 ### Features
 
@@ -26,7 +39,7 @@
 ![](https://i.imgur.com/U2LdSW8.png)
 ![](https://i.imgur.com/ORE5cjy.png)
 
-### Scripts & Tasks
+### Scripting
 
 Scripts and tasks are written in Kotlin, an awesome programming language for manipulating nullable objects, callbacks, and types.
 
@@ -107,5 +120,3 @@ When you type "example anything" ("anything" can be anything), it will write the
 - [Gradle](https://gradle.org/)
 
 - [IntelliJ IDEA](https://www.jetbrains.com/idea/)
-
-
