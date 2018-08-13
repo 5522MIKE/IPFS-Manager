@@ -26,6 +26,8 @@
 
 - You can create scripts and tasks in Kotlin
 
+- Drag and drop files
+
 - Clear & Minimalist UI
 
 ### Download
