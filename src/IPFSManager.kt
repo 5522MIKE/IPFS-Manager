@@ -1,9 +1,14 @@
 package fr.rhaz.ipfs
 
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.client.j2se.MatrixToImageWriter
+import com.google.zxing.qrcode.QRCodeWriter
 import io.ipfs.kotlin.IPFS
 import javafx.animation.FadeTransition
 import javafx.application.Application
 import javafx.application.Platform
+import javafx.embed.swing.SwingFXUtils
 import javafx.event.EventHandler
 import javafx.geometry.Insets
 import javafx.geometry.Pos
@@ -13,6 +18,7 @@ import javafx.scene.control.Label
 import javafx.scene.control.TextArea
 import javafx.scene.control.TextField
 import javafx.scene.image.Image
+import javafx.scene.image.ImageView
 import javafx.scene.input.TransferMode
 import javafx.scene.layout.*
 import javafx.scene.text.Font
@@ -20,13 +26,12 @@ import javafx.stage.Modality
 import javafx.stage.Stage
 import javafx.stage.WindowEvent
 import javafx.util.Duration
-import java.awt.MenuItem
-import java.awt.PopupMenu
-import java.awt.SystemTray
-import java.awt.TrayIcon
+import java.awt.*
 import java.awt.event.ActionListener
 import java.io.File
+import java.net.URI
 import java.net.URLClassLoader
+import java.nio.file.FileSystems
 import javax.imageio.ImageIO
 
 fun main(args: Array<String>) {
@@ -225,46 +230,39 @@ class IPFSManager : Application() {
     }
 
     val open: (File) -> Unit = content@{ file ->
-        val hash = ipfs.add.file(file, file.nameWithoutExtension, file.name)
-        dialog(file.name, """
-            ${hash.Hash}
-
-            http://ipfs.io/ipfs/${hash.Hash}
-
-            ipfs://${hash.Hash}
-
-            https://ipfs.io/docs/examples/qr-render/qr#${hash.Hash}
-        """.trimIndent());
+        val hash = ipfs.add.file(file, file.nameWithoutExtension, file.name).Hash
+        val url = "https://ipfs.io/ipfs/$hash"
+        dialog(file.name, VBox().apply {
+            padding = Insets(32.0)
+            Label(hash).apply {
+                font = Font.font(20.0)
+                setOnMouseClicked { Desktop.getDesktop().browse(URI(url)) }
+            }.also { children.add(it) }
+            StackPane().apply {
+                translateY = 20.0
+                padding = Insets(32.0)
+                ImageView(qr(url, 200, 200)).apply {
+                    style = "-fx-background-color: transparent"
+                }.also { children.add(it) }
+            }.also { children.add(it) }
+        });
     }
 
-    val dialog: (title: String, msg: String) -> Unit = { title, msg ->
+    fun qr(text: String, width: Int, height: Int) =
+        QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, width, height, mapOf(EncodeHintType.MARGIN to 0))
+            .let{MatrixToImageWriter.toBufferedImage(it)}
+            .let{SwingFXUtils.toFXImage(it, null)}
+
+    val dialog: (title: String, pane: Pane) -> Unit = { title, pane ->
 
         val dialog = Stage()
-
-        val vbox = VBox().apply {
-            alignment = Pos.CENTER
-            padding = Insets(15.0)
-
-            TextArea(msg).apply {
-                style = "-fx-background-color: transparent; -fx-background-insets: 0px"
-                padding = Insets(0.0, 0.0, 16.0, 0.0)
-                isWrapText = true
-                isEditable = false
-                background = Background.EMPTY
-            }.also {children.add(it)}
-
-            Button("Close").apply {
-                style = "-fx-background-color: white"
-                setOnAction { dialog.close() }
-            }.also {children.add(it) }
-        }
 
         dialog.apply {
             icons.add(Image(icon))
             this.title = title
             isAlwaysOnTop = true
             initModality(Modality.WINDOW_MODAL)
-            scene = Scene(vbox)
+            scene = Scene(pane)
             show()
         }
     }
