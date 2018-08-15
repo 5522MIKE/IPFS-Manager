@@ -41,6 +41,13 @@
 ![](https://i.imgur.com/U2LdSW8.png)
 ![](https://i.imgur.com/ORE5cjy.png)
 
+### Videos
+
+[IPFS-Manager #1 : Compiling & Running a script
+](https://youtu.be/A1ljWpe_CS0)
+
+[Roscoe's IPFS](https://www.youtube.com/watch?v=CCiGgnRSAN0)
+
 ### Scripting
 
 Scripts and tasks are written in Kotlin, an awesome programming language for manipulating nullable objects, callbacks, and types.
@@ -84,9 +91,9 @@ You can use tasks to automate actions like adding files, retrieve domains, publi
 
         override fun onCall(line: String){
 
-            val version = ipfs.info.version() ?: return
+            val version = ipfs.version() ?: return
             // Request the version. If there is an error, do not continue
-            log.append(version.Version)
+            log.append(version)
             // Write the version
 
             val args = line.split(" ")

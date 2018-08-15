@@ -7,8 +7,8 @@ public class ExampleTask: Task("example"){
 
     override fun onCall(line: String){
 
-        val version = ipfs.info.version() ?: return
-        log.append(version.Version)
+        val version = ipfs.version() ?: return
+        log.append(version)
 
         val args = line.split(" ")
         if(args.size > 1) log.append(args[1])
