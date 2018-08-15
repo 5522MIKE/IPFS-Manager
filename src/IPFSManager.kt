@@ -4,21 +4,28 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.client.j2se.MatrixToImageWriter
 import com.google.zxing.qrcode.QRCodeWriter
-import io.ipfs.kotlin.IPFS
+import io.ipfs.api.IPFS
+import io.ipfs.api.NamedStreamable
+import io.ipfs.api.NamedStreamable.*
 import javafx.animation.FadeTransition
 import javafx.application.Application
 import javafx.application.Platform
+import javafx.collections.FXCollections
 import javafx.embed.swing.SwingFXUtils
 import javafx.event.EventHandler
 import javafx.geometry.Insets
 import javafx.geometry.Pos
 import javafx.scene.Scene
+import javafx.scene.control.*
 import javafx.scene.control.Button
 import javafx.scene.control.Label
 import javafx.scene.control.TextArea
 import javafx.scene.control.TextField
 import javafx.scene.image.Image
 import javafx.scene.image.ImageView
+import javafx.scene.input.ClipboardContent
+import javafx.scene.input.MouseButton.PRIMARY
+import javafx.scene.input.MouseButton.SECONDARY
 import javafx.scene.input.TransferMode
 import javafx.scene.layout.*
 import javafx.scene.text.Font
@@ -27,11 +34,13 @@ import javafx.stage.Stage
 import javafx.stage.WindowEvent
 import javafx.util.Duration
 import java.awt.*
+import java.awt.MenuItem
+import java.awt.datatransfer.StringSelection
 import java.awt.event.ActionListener
 import java.io.File
 import java.net.URI
 import java.net.URLClassLoader
-import java.nio.file.FileSystems
+import java.util.*
 import javax.imageio.ImageIO
 
 fun main(args: Array<String>) {
@@ -114,7 +123,7 @@ class IPFSManager : Application() {
         }
     }
 
-    var ipfs = IPFS()
+    var ipfs = IPFS("/ip4/127.0.0.1/tcp/5001")
 
     lateinit var status: Label
     val content: StackPane by lazy {
@@ -144,7 +153,7 @@ class IPFSManager : Application() {
             }
 
             ipfsd.listeners.onDownloaded.add(Runnable {
-                async(3, {ipfs.info.version()}, {console()}, error)
+                async(3, {ipfs.version()}, {console()}, error)
             })
 
             download()
@@ -229,20 +238,111 @@ class IPFSManager : Application() {
         }
     }
 
+    val keys
+        get() = FXCollections.observableArrayList(ipfs.key.list().map {"${it.name} (${it.id.toBase58()})"}).apply {
+            add("Create new key")
+        }
+
     val open: (File) -> Unit = content@{ file ->
-        val hash = ipfs.add.file(file, file.nameWithoutExtension, file.name).Hash
+        val hash = ipfs.add(FileWrapper(file))[0].hash
         val url = "https://ipfs.io/ipfs/$hash"
-        dialog(file.name, VBox().apply {
+        dialog(file.name, StackPane().apply{
             padding = Insets(32.0)
-            Label(hash).apply {
+            minHeight = 400.0
+            val hint = Label("Click to open     Right click to copy").apply {
+                translateY = -130.0
+            }.also { children.add(it) }
+            Label(hash.toBase58()).apply {
+                translateY = -160.0
                 font = Font.font(20.0)
-                setOnMouseClicked { Desktop.getDesktop().browse(URI(url)) }
+                setOnMouseClicked { ev -> when (ev.button) {
+                    PRIMARY -> Desktop.getDesktop().browse(URI(url))
+                    SECONDARY ->  {
+                        Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(hash.toBase58()), null)
+                        val txt = hint.text
+                        hint.text = "Copied to clipboard"
+                        wait(1000){hint.text = txt}
+                    }
+                } }
+                setOnDragDetected {
+                    ClipboardContent().apply {
+                        putString(hash.toBase58())
+                        startDragAndDrop(*TransferMode.ANY).setContent(this)
+                    }
+                }
+            }.also { children.add(it) }
+            Button("Publish to...").apply {
+                translateY = -90.0
+                style = "-fx-background-color: white"
+                setOnAction {
+                    dialog(file.name, StackPane().apply dialog@{
+                        minHeight = 200.0
+                        minWidth = 400.0
+                        val txt = Label("Publish to:").apply {
+                            translateY = -40.0
+                            padding = Insets(16.0)
+                            font = Font.font(20.0)
+                        }.also { children.add(it) }
+                        HBox().apply hbox@{
+                            alignment = Pos.CENTER
+                            val box = ComboBox(keys).apply box@{
+                                style = "-fx-background-color: white"
+                                value = keys[0]
+                                maxWidth = 200.0
+                                selectionModel.selectedItemProperty().addListener { _,_,value ->
+                                    if(value != "Create new key") return@addListener
+                                    dialog(value, HBox().apply {
+                                        padding = Insets(16.0)
+                                        val id = TextField("").apply {
+                                            style = "-fx-background-color: white"
+                                            promptText = "id"
+                                        }.also { children.add(it) }
+                                        Button("Create").apply {
+                                            style = "-fx-background-color: white"
+                                            setOnAction {
+                                                async(60, {
+                                                    ipfs.key.gen(id.text, Optional.of("rsa"), Optional.of("2048"))
+                                                }, {
+                                                    scene.window.hide()
+                                                    this@box.selectionModel.select(0)
+                                                    this@box.items = keys
+                                                }, {})
+                                            }
+                                        }.also { children.add(it) }
+                                    })
+                                }
+                            }.also { children.add(it) }
+                            Button("Publish").apply {
+                                style = "-fx-background-color: white"
+                                setOnAction {
+                                    val id = box.value.split(" ")[0]
+                                    txt.text = "Publishing to $id..."
+                                    txt.translateY = -30.0
+                                    this@dialog.children.remove(this@hbox)
+                                    val hint = Label("please wait")
+                                    this@dialog.children.add(hint)
+                                    async(300, {
+                                        ipfs.name.publish(hash, Optional.of(id))["Name"]
+                                    }, {
+                                        val url = "https://ipfs.io/ipns/$it"
+                                        txt.text = "Published!"
+                                        hint.text = "Click to open"
+                                        txt.setOnMouseClicked { Desktop.getDesktop().browse(URI(url)) }
+                                    }, {
+                                        txt.text = "Error!"
+                                    })
+                                }
+                            }.also { children.add(it) }
+                        }.also { children.add(it) }
+                    })
+                }
             }.also { children.add(it) }
             StackPane().apply {
-                translateY = 20.0
-                padding = Insets(32.0)
+                translateY = 60.0
+                maxHeight = 200.0
+                maxWidth = 200.0
                 ImageView(qr(url, 200, 200)).apply {
-                    style = "-fx-background-color: transparent"
+                    padding = Insets(0.0)
                 }.also { children.add(it) }
             }.also { children.add(it) }
         });
@@ -275,10 +375,11 @@ fun TextArea.append(msg: String){
     scrollTop = Double.MAX_VALUE
 }
 
-fun async(timeout: Int, runnable: () -> Any?, success: () -> Unit, error: () -> Unit) = Thread{
+fun async(timeout: Int, runnable: () -> Any?, success: (Any) -> Unit, error: () -> Unit) = Thread{
     try {
-        if (runnable() != null)
-            Platform.runLater(success)
+        val result = runnable()
+        if(result != null)
+            Platform.runLater{success(result)}
         else Platform.runLater(error)
     }catch(ex: Exception) {Platform.runLater(error)}
 }.apply{tasker(timeout, error)}
