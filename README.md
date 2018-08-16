@@ -24,17 +24,25 @@
 
 - Supports all IPFS actions
 
+- Command-Line + Graphical
+
 - You can create scripts and tasks in Kotlin
 
 - Drag and drop files
+
+- Publish to IPNS
+
+- Create IPNS keys
+
+- Generates QR codes
 
 - Clear & Minimalist UI
 
 ### Download
 
-- [Windows](https://github.com/RHazDev/IPFS-Manager/raw/master/exe/ipfs-manager-1.2.3.exe)
+- [Windows](https://github.com/RHazDev/IPFS-Manager/raw/master/exe/ipfs-manager-1.2.4.exe)
 
-- [Linux, MacOS, Freebsd](https://github.com/RHazDev/IPFS-Manager/raw/master/jar/ipfs-manager-1.2.3.jar)
+- [Linux, MacOS, Freebsd](https://github.com/RHazDev/IPFS-Manager/raw/master/jar/ipfs-manager-1.2.4.jar)
 
 ### Screenshots
 ![](https://i.imgur.com/oczGUfE.png)

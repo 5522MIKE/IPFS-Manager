@@ -7,8 +7,10 @@ import com.google.zxing.EncodeHintType
 import com.google.zxing.client.j2se.MatrixToImageWriter
 import com.google.zxing.qrcode.QRCodeWriter
 import io.ipfs.api.IPFS
+import io.ipfs.api.MerkleNode
 import io.ipfs.api.NamedStreamable
 import io.ipfs.api.NamedStreamable.*
+import io.ipfs.multihash.Multihash
 import javafx.animation.FadeTransition
 import javafx.application.Application
 import javafx.application.Platform
@@ -17,6 +19,7 @@ import javafx.embed.swing.SwingFXUtils
 import javafx.event.EventHandler
 import javafx.geometry.Insets
 import javafx.geometry.Pos
+import javafx.scene.Cursor
 import javafx.scene.Scene
 import javafx.scene.control.*
 import javafx.scene.control.Button
@@ -203,7 +206,7 @@ class IPFSManager : Application() {
         }
 
         log.apply {
-            text = "Connected! Type something"
+            text = "Connected! Type something or Drag & Drop a file/folder"
             style = "-fx-background-color: transparent; -fx-background-insets: 0px"
             padding = Insets(16.0)
             isEditable = false
@@ -235,22 +238,66 @@ class IPFSManager : Application() {
         get() = FXCollections.observableArrayList(ipfs.key.list().map {"${it.name} (${it.id.toBase58()})"})
                 .apply { add("Create new key") }
 
-    val open: (File) -> Unit = content@{ file ->
-        val hash = ipfs.add(FileWrapper(file))[0].hash
-        val url = "https://ipfs.io/ipfs/$hash"
+    val open: (File) -> Unit = content@{ file -> dialog(file.name, StackPane().apply {
+        minHeight = 150.0
+        minWidth = 300.0
+        padding = Insets(16.0)
+        Label("Wrap into a directory?").apply {
+            translateY = -20.0
+            font = Font.font(20.0)
+        }.also { children.add(it) }
+        Button("Yes").apply {
+            translateY = 20.0
+            translateX = -60.0
+            minWidth = 100.0
+            style = "-fx-background-color: white"
+            isDefaultButton = true
+            setOnAction {
+                scene.window.hide()
+                ipfs.add(FileWrapper(file), true)[1].hash.also { info(file, it) }
+            }
+        }.also { children.add(it) }
+        Button("No").apply {
+            translateY = 20.0
+            translateX = 60.0
+            minWidth = 100.0
+            style = "-fx-background-color: white"
+            isCancelButton = true
+            setOnAction {
+                scene.window.hide()
+                ipfs.add(FileWrapper(file), false)[0].hash.also { info(file, it) }
+            }
+        }.also { children.add(it) }
+    })}
+
+    val info: (File, Multihash) -> Unit = content@{ file, hash ->
         dialog(file.name, StackPane().apply{
+            var url = "https://ipfs.io/ipfs/$hash"
             padding = Insets(32.0)
             minHeight = 400.0
-            val hint = Label("Click to open     Right click to copy").apply {
+            minWidth = 400.0
+            val hint = Label("Double-click to open         Right click to copy").apply {
                 translateY = -130.0
             }.also { children.add(it) }
-            Label(hash.toBase58()).apply {
+            Label("$hash").apply {
                 translateY = -160.0
                 font = Font.font(20.0)
+                var switch = 1
+                fun switch() = when(switch++%4){
+                    0 -> text = "$hash"
+                    1 -> text = "http://ipfs.io/ipfs/$hash"
+                    2 -> text = "ipfs://$hash"
+                    3 -> text = "/ipfs/$hash"
+                    else -> {}
+                }
+                var last: Thread? = null
                 setOnMouseClicked { ev -> when(ev.button) {
-                    PRIMARY -> Desktop.getDesktop().browse(URI(url))
+                    PRIMARY -> when(ev.clickCount){
+                        1 -> last = wait(500){switch()}
+                        2 -> Desktop.getDesktop().browse(URI(url)).also{last?.interrupt()}
+                    }
                     SECONDARY ->  {
-                        Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(hash.toBase58()), null)
+                        Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(text), null)
                         val txt = hint.text
                         hint.text = "Copied to clipboard"
                         wait(1000){hint.text = txt}
@@ -258,7 +305,7 @@ class IPFSManager : Application() {
                 } }
                 setOnDragDetected {
                     ClipboardContent().apply {
-                        putString(hash.toBase58())
+                        putString(text)
                         startDragAndDrop(*TransferMode.ANY).setContent(this)
                     }
                 }
@@ -283,21 +330,25 @@ class IPFSManager : Application() {
                                 maxWidth = 200.0
                                 selectionModel.selectedItemProperty().addListener { _,_,value ->
                                     if(value != "Create new key") return@addListener
-                                    dialog(value, HBox().apply {
+                                    dialog(value, HBox().apply dialog@{
                                         padding = Insets(16.0)
                                         val id = TextField("")
                                         val action = {
+                                            this@dialog.cursor = Cursor.WAIT
                                             async(60,{
                                                 ipfs.key.gen(id.text, Optional.of("rsa"), Optional.of("2048"))
                                             }, {
                                                 scene.window.hide()
                                                 this@box.selectionModel.select(0)
                                                 this@box.items = keys
-                                            }, {})
+                                            }, {this@dialog.cursor = Cursor.DEFAULT})
                                         }
                                         id.apply {
                                             style = "-fx-background-color: white"
                                             promptText = "id"
+                                            textProperty().addListener { _,_,new ->
+                                                text = new.replace(Regex("[^a-zA-Z]"), "").toLowerCase()
+                                            }
                                             setOnAction{action()}
                                         }.also { children.add(it) }
                                         Button("Create").apply {
@@ -312,22 +363,54 @@ class IPFSManager : Application() {
                                 style = "-fx-background-color: white"
                                 isDefaultButton = true
                                 setOnAction {
+                                    this@dialog.cursor = Cursor.WAIT
                                     val id = box.value.split(" ")[0]
                                     txt.text = "Publishing to $id..."
                                     txt.translateY = -30.0
                                     this@dialog.children.remove(this@hbox)
                                     val hint = Label("please wait")
                                     this@dialog.children.add(hint)
-                                    async(300, {
+                                    val task = async(300, {
                                         ipfs.name.publish(hash, Optional.of(id))["Name"]
                                     }, {
+                                        this@dialog.cursor = Cursor.DEFAULT
                                         val url = "https://ipfs.io/ipns/$it"
-                                        txt.text = "Published!"
-                                        hint.text = "Click to open"
-                                        txt.setOnMouseClicked { Desktop.getDesktop().browse(URI(url)) }
+                                        txt.text = "$hash"
+                                        hint.text = "Click to open         Right click to copy"
+                                        var switch = 1
+                                        fun switch() = when(switch++%4){
+                                            0 -> text = "$hash"
+                                            1 -> text = "http://ipfs.io/ipns/$hash"
+                                            2 -> text = "ipns://$hash"
+                                            3 -> text = "/ipns/$hash"
+                                            else -> {}
+                                        }
+                                        var last: Thread? = null
+                                        txt.setOnMouseClicked { ev -> when(ev.button) {
+                                            PRIMARY -> when(ev.clickCount){
+                                                1 -> last = wait(500){switch()}
+                                                2 -> Desktop.getDesktop().browse(URI(url)).also{last?.interrupt()}
+                                            }
+                                            SECONDARY -> {
+                                                Toolkit.getDefaultToolkit().systemClipboard
+                                                        .setContents(StringSelection(it.toString()), null)
+                                                val txt = hint.text
+                                                hint.text = "Copied to clipboard"
+                                                wait(1000){hint.text = txt}
+                                            }
+                                        }}
                                     }, {
+                                        this@dialog.cursor = Cursor.DEFAULT
                                         txt.text = "Error!"
                                     })
+                                    Thread{ while(!task.isInterrupted) {
+                                        when ((System.currentTimeMillis() / 1000) % 3) {
+                                            0L -> Platform.runLater { txt.text = "Publishing to $id..." }
+                                            1L -> Platform.runLater { txt.text = "Publishing to $id...." }
+                                            2L -> Platform.runLater { txt.text = "Publishing to $id....." }
+                                            else -> {}
+                                        }; Thread.sleep(1000)
+                                    } }.start()
                                 }
                             }.also { children.add(it) }
                         }.also { children.add(it) }
@@ -395,7 +478,7 @@ fun Thread.tasker(timeout: Int, error: () -> Unit) = {
 fun wait(timeout: Long, callback: () -> Unit) = {
     Thread.sleep(timeout)
     Platform.runLater { callback() }
-}.let { Thread(it).start() }
+}.let { Thread(it) }.apply { start() }
 
 val dfolder = File("scripts")
 
