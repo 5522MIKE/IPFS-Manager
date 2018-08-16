@@ -141,6 +141,7 @@ class IPFSManager : Application() {
                 Button("Start Daemon").apply {
                     translateY = 20.0
                     style = "-fx-background-color: white"
+                    cursor = Cursor.HAND
                     setOnAction {
                         isVisible = false
                         start()
@@ -247,6 +248,7 @@ class IPFSManager : Application() {
             font = Font.font(20.0)
         }.also { children.add(it) }
         Button("Yes").apply {
+            cursor = Cursor.HAND
             translateY = 20.0
             translateX = -60.0
             minWidth = 100.0
@@ -258,6 +260,7 @@ class IPFSManager : Application() {
             }
         }.also { children.add(it) }
         Button("No").apply {
+            cursor = Cursor.HAND
             translateY = 20.0
             translateX = 60.0
             minWidth = 100.0
@@ -280,6 +283,7 @@ class IPFSManager : Application() {
                 translateY = -130.0
             }.also { children.add(it) }
             Label("$hash").apply {
+                cursor = Cursor.HAND
                 translateY = -160.0
                 font = Font.font(20.0)
                 var switch = 1
@@ -311,6 +315,7 @@ class IPFSManager : Application() {
                 }
             }.also { children.add(it) }
             Button("Publish to...").apply {
+                cursor = Cursor.HAND
                 translateY = -90.0
                 style = "-fx-background-color: white"
                 setOnAction {
@@ -325,6 +330,7 @@ class IPFSManager : Application() {
                         HBox().apply hbox@{
                             alignment = Pos.CENTER
                             val box = ComboBox(keys).apply box@{
+                                cursor = Cursor.HAND
                                 style = "-fx-background-color: white"
                                 value = keys[0]
                                 maxWidth = 200.0
@@ -352,6 +358,7 @@ class IPFSManager : Application() {
                                             setOnAction{action()}
                                         }.also { children.add(it) }
                                         Button("Create").apply {
+                                            cursor = Cursor.HAND
                                             style = "-fx-background-color: white"
                                             isDefaultButton = true
                                             setOnAction{action()}
@@ -360,6 +367,7 @@ class IPFSManager : Application() {
                                 }
                             }.also { children.add(it) }
                             Button("Publish").apply {
+                                cursor = Cursor.HAND
                                 style = "-fx-background-color: white"
                                 isDefaultButton = true
                                 setOnAction {
@@ -372,38 +380,41 @@ class IPFSManager : Application() {
                                     this@dialog.children.add(hint)
                                     val task = async(300, {
                                         ipfs.name.publish(hash, Optional.of(id))["Name"]
-                                    }, {
+                                    }, { hash ->
                                         this@dialog.cursor = Cursor.DEFAULT
-                                        val url = "https://ipfs.io/ipns/$it"
-                                        txt.text = "$hash"
-                                        hint.text = "Click to open         Right click to copy"
-                                        var switch = 1
-                                        fun switch() = when(switch++%4){
-                                            0 -> text = "$hash"
-                                            1 -> text = "http://ipfs.io/ipns/$hash"
-                                            2 -> text = "ipns://$hash"
-                                            3 -> text = "/ipns/$hash"
-                                            else -> {}
+                                        val url = "https://ipfs.io/ipns/$hash"
+                                        hint.text = "Double-click to open         Right click to copy"
+                                        txt.apply {
+                                            text = "$hash"
+                                            cursor = Cursor.HAND
+                                            var switch = 1
+                                            fun switch() = when(switch++%4){
+                                                0 -> text = "$hash"
+                                                1 -> text = "http://ipfs.io/ipns/$hash"
+                                                2 -> text = "ipns://$hash"
+                                                3 -> text = "/ipns/$hash"
+                                                else -> {}
+                                            }
+                                            var last: Thread? = null
+                                            txt.setOnMouseClicked { ev -> when(ev.button) {
+                                                PRIMARY -> when(ev.clickCount){
+                                                    1 -> last = wait(500){switch()}
+                                                    2 -> Desktop.getDesktop().browse(URI(url)).also{last?.interrupt()}
+                                                }
+                                                SECONDARY -> {
+                                                    Toolkit.getDefaultToolkit().systemClipboard
+                                                            .setContents(StringSelection(text), null)
+                                                    val htext = hint.text
+                                                    hint.text = "Copied to clipboard"
+                                                    wait(1000){hint.text = htext}
+                                                }
+                                            }}
                                         }
-                                        var last: Thread? = null
-                                        txt.setOnMouseClicked { ev -> when(ev.button) {
-                                            PRIMARY -> when(ev.clickCount){
-                                                1 -> last = wait(500){switch()}
-                                                2 -> Desktop.getDesktop().browse(URI(url)).also{last?.interrupt()}
-                                            }
-                                            SECONDARY -> {
-                                                Toolkit.getDefaultToolkit().systemClipboard
-                                                        .setContents(StringSelection(it.toString()), null)
-                                                val txt = hint.text
-                                                hint.text = "Copied to clipboard"
-                                                wait(1000){hint.text = txt}
-                                            }
-                                        }}
                                     }, {
                                         this@dialog.cursor = Cursor.DEFAULT
                                         txt.text = "Error!"
                                     })
-                                    Thread{ while(!task.isInterrupted) {
+                                    Thread{while(task.isAlive) {
                                         when ((System.currentTimeMillis() / 1000) % 3) {
                                             0L -> Platform.runLater { txt.text = "Publishing to $id..." }
                                             1L -> Platform.runLater { txt.text = "Publishing to $id...." }

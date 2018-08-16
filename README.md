@@ -40,9 +40,9 @@
 
 ### Download
 
-- [Windows](https://github.com/RHazDev/IPFS-Manager/raw/master/exe/ipfs-manager-1.2.4.exe)
+- [Windows](https://github.com/RHazDev/IPFS-Manager/raw/master/exe/ipfs-manager-1.2.5.exe)
 
-- [Linux, MacOS, Freebsd](https://github.com/RHazDev/IPFS-Manager/raw/master/jar/ipfs-manager-1.2.4.jar)
+- [Linux, MacOS, Freebsd](https://github.com/RHazDev/IPFS-Manager/raw/master/jar/ipfs-manager-1.2.5.jar)
 
 ### Screenshots
 ![](https://i.imgur.com/oczGUfE.png)
