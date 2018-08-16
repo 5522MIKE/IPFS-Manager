@@ -1,3 +1,5 @@
+@file:Suppress("NON_EXHAUSTIVE_WHEN")
+
 package fr.rhaz.ipfs
 
 import com.google.zxing.BarcodeFormat
@@ -72,7 +74,7 @@ class IPFSManager : Application() {
         title = "IPFS Manager"
         minWidth = 600.0
         minHeight = 400.0
-        scene = Scene(Body, minWidth, minHeight).apply {
+        scene = Scene(body, minWidth, minHeight).apply {
             stylesheets.add(stylesheet)
         }
     }
@@ -110,20 +112,12 @@ class IPFSManager : Application() {
         }
     }
 
-    val Body: BorderPane by lazy {
-        BorderPane().apply {
-            top = Top
-            center = content
-        }
-    }
+    val body by lazy { BorderPane().apply{
+        center = content
+    }}
 
-    val Top: HBox by lazy {
-        HBox().apply {
-
-        }
-    }
-
-    var ipfs = IPFS("/ip4/127.0.0.1/tcp/5001")
+    val ipfs: IPFS
+        get() = IPFS("/ip4/127.0.0.1/tcp/5001")
 
     lateinit var status: Label
     val content: StackPane by lazy {
@@ -153,7 +147,7 @@ class IPFSManager : Application() {
             }
 
             ipfsd.listeners.onDownloaded.add(Runnable {
-                async(3, {ipfs.version()}, {console()}, error)
+                async(3, {ipfs}, {console()}, error)
             })
 
             download()
@@ -211,13 +205,12 @@ class IPFSManager : Application() {
         log.apply {
             text = "Connected! Type something"
             style = "-fx-background-color: transparent; -fx-background-insets: 0px"
-            padding = Insets(16.0, 16.0, 32.0, 16.0)
+            padding = Insets(16.0)
             isEditable = false
             background = Background.EMPTY
         }.also { content.children.add(it) }
 
         TextField().apply {
-            translateY = 180.0
             padding = Insets(16.0)
             style = "-fx-background-color: transparent"
             promptText = "name publish Qm..."
@@ -230,7 +223,7 @@ class IPFSManager : Application() {
                         ?: process(*text.split(" ").toTypedArray())
                 }
             }
-        }.also { content.children.add(it) }
+        }.also { body.bottom = it }
 
         loadAll().values.apply{
             forEach {it.log = log}
@@ -239,9 +232,8 @@ class IPFSManager : Application() {
     }
 
     val keys
-        get() = FXCollections.observableArrayList(ipfs.key.list().map {"${it.name} (${it.id.toBase58()})"}).apply {
-            add("Create new key")
-        }
+        get() = FXCollections.observableArrayList(ipfs.key.list().map {"${it.name} (${it.id.toBase58()})"})
+                .apply { add("Create new key") }
 
     val open: (File) -> Unit = content@{ file ->
         val hash = ipfs.add(FileWrapper(file))[0].hash
@@ -255,7 +247,7 @@ class IPFSManager : Application() {
             Label(hash.toBase58()).apply {
                 translateY = -160.0
                 font = Font.font(20.0)
-                setOnMouseClicked { ev -> when (ev.button) {
+                setOnMouseClicked { ev -> when(ev.button) {
                     PRIMARY -> Desktop.getDesktop().browse(URI(url))
                     SECONDARY ->  {
                         Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(hash.toBase58()), null)
@@ -293,27 +285,32 @@ class IPFSManager : Application() {
                                     if(value != "Create new key") return@addListener
                                     dialog(value, HBox().apply {
                                         padding = Insets(16.0)
-                                        val id = TextField("").apply {
+                                        val id = TextField("")
+                                        val action = {
+                                            async(60,{
+                                                ipfs.key.gen(id.text, Optional.of("rsa"), Optional.of("2048"))
+                                            }, {
+                                                scene.window.hide()
+                                                this@box.selectionModel.select(0)
+                                                this@box.items = keys
+                                            }, {})
+                                        }
+                                        id.apply {
                                             style = "-fx-background-color: white"
                                             promptText = "id"
+                                            setOnAction{action()}
                                         }.also { children.add(it) }
                                         Button("Create").apply {
                                             style = "-fx-background-color: white"
-                                            setOnAction {
-                                                async(60, {
-                                                    ipfs.key.gen(id.text, Optional.of("rsa"), Optional.of("2048"))
-                                                }, {
-                                                    scene.window.hide()
-                                                    this@box.selectionModel.select(0)
-                                                    this@box.items = keys
-                                                }, {})
-                                            }
+                                            isDefaultButton = true
+                                            setOnAction{action()}
                                         }.also { children.add(it) }
                                     })
                                 }
                             }.also { children.add(it) }
                             Button("Publish").apply {
                                 style = "-fx-background-color: white"
+                                isDefaultButton = true
                                 setOnAction {
                                     val id = box.value.split(" ")[0]
                                     txt.text = "Publishing to $id..."

@@ -32,9 +32,9 @@
 
 ### Download
 
-- [Windows](https://github.com/RHazDev/IPFS-Manager/raw/master/exe/ipfs-manager-1.2.2.exe)
+- [Windows](https://github.com/RHazDev/IPFS-Manager/raw/master/exe/ipfs-manager-1.2.3.exe)
 
-- [Linux, MacOS, Freebsd](https://github.com/RHazDev/IPFS-Manager/raw/master/jar/ipfs-manager-1.2.2.jar)
+- [Linux, MacOS, Freebsd](https://github.com/RHazDev/IPFS-Manager/raw/master/jar/ipfs-manager-1.2.3.jar)
 
 ### Screenshots
 ![](https://i.imgur.com/oczGUfE.png)
@@ -54,7 +54,7 @@ Scripts and tasks are written in Kotlin, an awesome programming language for man
 
 You can learn it here: http://try.kotlinlang.org/koans
 
-They use [IPFS-API-Kotlin](https://github.com/ligi/ipfs-api-kotlin) for interacting with IPFS
+They use [Java-IPFS-API](https://github.com/ipfs/java-ipfs-api) for interacting with IPFS
 
 You can compile them easily with [Kotlin-Compiler-GUI](https://github.com/RHazDev/Kotlin-Compiler-GUI)
 
@@ -114,7 +114,7 @@ When you type "example anything" ("anything" can be anything), it will write the
 
 - [IPFS-Daemon](https://github.com/RHazDev/IPFS-Daemon)
 
-- [IPFS-API-Kotlin](https://github.com/ligi/ipfs-api-kotlin)
+- [Java-IPFS-API](https://github.com/ipfs/java-ipfs-api)
 
 - [Kotlin-Compiler-GUI](https://github.com/RHazDev/Kotlin-Compiler-GUI)
 
