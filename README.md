@@ -45,9 +45,8 @@
 - [Linux, MacOS, Freebsd](https://github.com/RHazDev/IPFS-Manager/raw/master/jar/ipfs-manager-1.2.5.jar)
 
 ### Screenshots
-![](https://i.imgur.com/oczGUfE.png)
 ![](https://i.imgur.com/U2LdSW8.png)
-![](https://i.imgur.com/ORE5cjy.png)
+![](https://i.imgur.com/SV6aHm3.png)
 
 ### Videos
 
