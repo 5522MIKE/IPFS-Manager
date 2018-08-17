@@ -28,6 +28,8 @@
 
 - You can create scripts and tasks in Kotlin
 
+- Modify your IPFS configuration
+
 - Drag and drop files
 
 - Publish to IPNS
@@ -40,9 +42,11 @@
 
 ### Download
 
-- [Windows](https://github.com/RHazDev/IPFS-Manager/raw/master/exe/ipfs-manager-1.2.5.exe)
+You need [Java 8](http://www.oracle.com/technetwork/java/javase/downloads/jre8-downloads-2133155.html)
 
-- [Linux, MacOS, Freebsd](https://github.com/RHazDev/IPFS-Manager/raw/master/jar/ipfs-manager-1.2.5.jar)
+- [Windows](https://github.com/RHazDev/IPFS-Manager/raw/master/exe/ipfs-manager-1.2.6.exe)
+
+- [Linux, MacOS, Freebsd](https://github.com/RHazDev/IPFS-Manager/raw/master/jar/ipfs-manager-1.2.6.jar)
 
 ### Screenshots
 ![](https://i.imgur.com/U2LdSW8.png)

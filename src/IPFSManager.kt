@@ -2,14 +2,15 @@
 
 package fr.rhaz.ipfs
 
+import com.google.gson.*
+import com.google.gson.stream.JsonWriter
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.client.j2se.MatrixToImageWriter
 import com.google.zxing.qrcode.QRCodeWriter
+import com.sun.java.accessibility.util.AWTEventMonitor.addActionListener
 import io.ipfs.api.IPFS
-import io.ipfs.api.MerkleNode
-import io.ipfs.api.NamedStreamable
-import io.ipfs.api.NamedStreamable.*
+import io.ipfs.api.NamedStreamable.FileWrapper
 import io.ipfs.multihash.Multihash
 import javafx.animation.FadeTransition
 import javafx.application.Application
@@ -24,6 +25,9 @@ import javafx.scene.Scene
 import javafx.scene.control.*
 import javafx.scene.control.Button
 import javafx.scene.control.Label
+import javafx.scene.control.Menu
+import javafx.scene.control.MenuBar
+import javafx.scene.control.MenuItem
 import javafx.scene.control.TextArea
 import javafx.scene.control.TextField
 import javafx.scene.image.Image
@@ -39,12 +43,15 @@ import javafx.stage.Stage
 import javafx.stage.WindowEvent
 import javafx.util.Duration
 import java.awt.*
-import java.awt.MenuItem
+import java.awt.MenuItem as AWTMenuItem
 import java.awt.datatransfer.StringSelection
 import java.awt.event.ActionListener
 import java.io.File
+import java.io.FileReader
+import java.io.FileWriter
 import java.net.URI
 import java.net.URLClassLoader
+import java.nio.file.Files
 import java.util.*
 import javax.imageio.ImageIO
 
@@ -92,12 +99,12 @@ class IPFSManager : Application() {
 
         val popup = PopupMenu()
 
-        MenuItem("Show me").apply {
+        AWTMenuItem("Show me").apply {
             addActionListener(show)
             popup.add(this)
         }
 
-        MenuItem("Close me").apply {
+        AWTMenuItem("Close me").apply {
             addActionListener(close)
             popup.add(this)
         }
@@ -189,9 +196,93 @@ class IPFSManager : Application() {
     fun start() = Thread{ipfsd.start(true)}.apply{start()}
     fun process(vararg args: String) = ipfsd.process(*args).also { ipfsd.gobble(it) }
 
+    val configfile by lazy {ipfsd.store["config"]}
+    val config by lazy{JsonParser().parse(FileReader(configfile)).asJsonObject}
+
+    fun config(consumer: (JsonObject) -> Unit){
+        consumer(config)
+        Files.write(configfile.toPath(), GsonBuilder().setPrettyPrinting().create().toJson(config).toByteArray())
+    }
+
     var log = TextArea()
     fun console(){
         status.text = "Connected"
+
+        val menu = MenuBar().also{body.top = it}.apply {
+            style = "-fx-background-color: transparent"
+            Menu("Config").also{menus.add(it)}.apply {
+                Menu("Identity").also{items.add(it)}.apply {
+                    MenuItem("PeerID").also{items.add(it)}.apply {
+                        setOnAction { dialog("PeerID", StackPane().apply {
+                            padding = Insets(16.0)
+                            val id = config.getAsJsonObject("Identity").getAsJsonPrimitive("PeerID").asString
+                            Label(id).also{children.add(it)}.apply {
+                                font = Font.font(20.0)
+                                setOnMouseClicked { ev -> when(ev.button){
+                                    SECONDARY -> {
+                                        Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(id), null)
+                                        text = "Copied to clipboard"
+                                        wait(1000){text = id}
+                                    }
+                                } }
+                                setOnDragDetected {
+                                    ClipboardContent().apply {
+                                        putString(id)
+                                        startDragAndDrop(*TransferMode.ANY).setContent(this)
+                                    }
+                                }
+                            }
+                        }) }
+                    }
+                }
+                Menu("Gateway").also{items.add(it)}.apply {
+                    CheckMenuItem("Writable").also{items.add(it)}.apply {
+                        isSelected = config.getAsJsonObject("Gateway").run {
+                            if(!has("Writable")) false
+                            else getAsJsonPrimitive("Writable").asBoolean
+                        }
+                        setOnAction { config{
+                            it.getAsJsonObject("Gateway").apply {
+                                remove("Writable")
+                                addProperty("Writable", isSelected)
+                            }
+                        } }
+                    }
+                }
+                Menu("API").also{items.add(it)}.apply {
+                    Menu("HTTPHeaders").also{items.add(it)}.apply {
+                        MenuItem("Add origin...").also{items.add(it)}.apply {
+                            setOnAction {
+                                dialog("Add origin", HBox().apply {
+                                    padding = Insets(16.0)
+                                    val action: (String) -> Unit = { origin ->
+                                        config {
+                                            it.getAsJsonObject("API").getAsJsonObject("HTTPHeaders").apply {
+                                                if(!has("Access-Control-Allow-Origin")) {
+                                                    add("Access-Control-Allow-Origin", JsonArray())
+                                                    getAsJsonArray("Access-Control-Allow-Origin").add("http://localhost:3000")
+                                                }
+                                                getAsJsonArray("Access-Control-Allow-Origin").add(origin)
+                                            }
+                                        }
+                                        scene.window.hide()
+                                    }
+                                    val input = TextField("").apply {
+                                        style = "-fx-background-color: white"
+                                        promptText = "http://..."
+                                        setOnAction{action(text)}
+                                    }.also { children.add(it) }
+                                    Button("Add").apply {
+                                        style = "-fx-background-color: white"
+                                        setOnAction {action(input.text)}
+                                    }.also { children.add(it) }
+                                })
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         content.setOnDragOver { it.acceptTransferModes(*TransferMode.ANY); }
         content.setOnDragDropped here@{
@@ -385,7 +476,6 @@ class IPFSManager : Application() {
                                         val url = "https://ipfs.io/ipns/$hash"
                                         hint.text = "Double-click to open         Right click to copy"
                                         txt.apply {
-                                            text = "$hash"
                                             cursor = Cursor.HAND
                                             var switch = 1
                                             fun switch() = when(switch++%4){
@@ -409,19 +499,12 @@ class IPFSManager : Application() {
                                                     wait(1000){hint.text = htext}
                                                 }
                                             }}
+                                            text = "$hash"
                                         }
                                     }, {
                                         this@dialog.cursor = Cursor.DEFAULT
                                         txt.text = "Error!"
                                     })
-                                    Thread{while(task.isAlive) {
-                                        when ((System.currentTimeMillis() / 1000) % 3) {
-                                            0L -> Platform.runLater { txt.text = "Publishing to $id..." }
-                                            1L -> Platform.runLater { txt.text = "Publishing to $id...." }
-                                            2L -> Platform.runLater { txt.text = "Publishing to $id....." }
-                                            else -> {}
-                                        }; Thread.sleep(1000)
-                                    } }.start()
                                 }
                             }.also { children.add(it) }
                         }.also { children.add(it) }
