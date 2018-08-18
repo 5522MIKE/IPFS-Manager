@@ -42,7 +42,7 @@
 
 ### Download
 
-You need [Java](http://www.oracle.com/technetwork/java/javase/downloads/jre10-downloads-4417026.html)
+You need [Java](https://java.com/download/) (It works with Java 8, Java 9 and Java 10)
 
 - [Windows](https://github.com/RHazDev/IPFS-Manager/raw/master/exe/ipfs-manager-1.2.7.exe)
 
