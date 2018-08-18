@@ -1,4 +1,4 @@
-@file:Suppress("NON_EXHAUSTIVE_WHEN")
+@file:Suppress("NON_EXHAUSTIVE_WHEN", "IMPLICIT_CAST_TO_ANY")
 
 package fr.rhaz.ipfs
 
@@ -38,9 +38,7 @@ import javafx.scene.input.MouseButton.SECONDARY
 import javafx.scene.input.TransferMode
 import javafx.scene.layout.*
 import javafx.scene.text.Font
-import javafx.stage.Modality
-import javafx.stage.Stage
-import javafx.stage.WindowEvent
+import javafx.stage.*
 import javafx.util.Duration
 import java.awt.*
 import java.awt.MenuItem as AWTMenuItem
@@ -158,7 +156,7 @@ class IPFSManager : Application() {
             }
 
             ipfsd.listeners.onDownloaded.add(Runnable {
-                async(3, {ipfs}, {console()}, error)
+                async(3, {ipfs}, {checkStore()}, error)
             })
 
             download()
@@ -179,7 +177,7 @@ class IPFSManager : Application() {
             })
             callback = here@{ process, msg ->
                 if(msg == "Daemon is ready")
-                    return@here Platform.runLater {console()}
+                    return@here Platform.runLater {checkStore()}
 
                 if(msg == "ipfs: Reading from /dev/stdin; send Ctrl-z to stop.") {
                     process.destroy()
@@ -196,117 +194,266 @@ class IPFSManager : Application() {
     fun start() = Thread{ipfsd.start(true)}.apply{start()}
     fun process(vararg args: String) = ipfsd.process(*args).also { ipfsd.gobble(it) }
 
-    val configfile by lazy {ipfsd.store["config"]}
-    val config by lazy{JsonParser().parse(FileReader(configfile)).asJsonObject}
+    val config by lazy{JsonParser().parse(FileReader(ipfsd.store["config"])).asJsonObject}
 
     fun config(consumer: (JsonObject) -> Unit){
         consumer(config)
-        Files.write(configfile.toPath(), GsonBuilder().setPrettyPrinting().create().toJson(config).toByteArray())
+        Files.write(ipfsd.store["config"].toPath(), GsonBuilder().setPrettyPrinting().create().toJson(config).toByteArray())
     }
 
-    var log = TextArea()
-    fun console(){
-        status.text = "Connected"
+    fun checkStore(): Unit = when {
 
+        ipfsd.store.exists() -> {
+            menu()
+            console()
+        }
 
+        File("../.ipfs").exists() -> {
+            ipfsd.store = File("../.ipfs")
+            menu()
+            console()
+        }
 
-        val menu = MenuBar().also{body.top = it}.apply {
-            style = "-fx-background-color: transparent"
-            Menu("Other").also{menus.add(it)}.apply {
-                MenuItem("Info").also{items.add(it)}.setOnAction {
-                    dialog("Info", StackPane().apply {
+        else -> Unit.also{
+            println(ipfsd.store.parentFile.name)
+            status.text = "Could not find .ipfs folder"
+            Button("Choose...").also{content.children.add(it)}.apply {
+                style = "-fx-background-color: white"
+                translateX = -80.0
+                translateY = 20.0
+                setOnMouseClicked {
+                    do {ipfsd.store = DirectoryChooser().showDialog(window)}
+                    while (ipfsd.store.name != ".ipfs")
+                    content.children.remove(this)
+                    menu()
+                    console()
+                }
+            }
+            Button("Continue anyway").also{content.children.add(it)}.apply {
+                style = "-fx-background-color: white"
+                translateX = 80.0
+                translateY = 20.0
+                setOnMouseClicked {
+                    console()
+                }
+            }
+
+        }
+    }
+
+    fun menu() = MenuBar().also{body.top = it}.apply {
+        style = "-fx-background-color: transparent"
+        Menu("Info").also{menus.add(it)}.apply {
+            Menu("Identity").also{items.add(it)}.apply {
+                MenuItem("PeerID").also{items.add(it)}.setOnAction {
+                    dialog("PeerID", StackPane().apply {
                         padding = Insets(16.0)
-                        Label(ipfs.version()).also{children.add(it)}.apply {
-
+                        val id = config.getAsJsonObject("Identity").getAsJsonPrimitive("PeerID").asString
+                        Label(id).also{children.add(it)}.apply {
+                            font = Font.font(20.0)
+                            setOnMouseClicked { ev -> when(ev.button){
+                                SECONDARY -> {
+                                    Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(id), null)
+                                    text = "Copied to clipboard"
+                                    wait(1000){text = id}
+                                }
+                            } }
+                            setOnDragDetected {
+                                ClipboardContent().apply {
+                                    putString(id)
+                                    startDragAndDrop(*TransferMode.ANY).setContent(this)
+                                }
+                            }
+                        }
+                    })
+                }
+                MenuItem("Private Key").also{items.add(it)}.setOnAction {
+                    dialog("Private Key", StackPane().apply {
+                        padding = Insets(16.0)
+                        TextArea().also{children.add(it)}.apply {
+                            style = "-fx-background-color: transparent; -fx-background-insets: 0px"
+                            background = Background.EMPTY
+                            isWrapText = true
+                            isEditable = false
+                            text = config.getAsJsonObject("Identity").getAsJsonPrimitive("PrivKey").asString
                         }
                     })
                 }
             }
-            Menu("Config").also{menus.add(it)}.apply {
-                Menu("Identity").also{items.add(it)}.apply {
-                    MenuItem("PeerID").also{items.add(it)}.setOnAction {
-                        dialog("PeerID", StackPane().apply {
-                            padding = Insets(16.0)
-                            val id = config.getAsJsonObject("Identity").getAsJsonPrimitive("PeerID").asString
-                            Label(id).also{children.add(it)}.apply {
-                                font = Font.font(20.0)
-                                setOnMouseClicked { ev -> when(ev.button){
-                                    SECONDARY -> {
-                                        Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(id), null)
-                                        text = "Copied to clipboard"
-                                        wait(1000){text = id}
-                                    }
-                                } }
-                                setOnDragDetected {
-                                    ClipboardContent().apply {
-                                        putString(id)
-                                        startDragAndDrop(*TransferMode.ANY).setContent(this)
-                                    }
-                                }
-                            }
-                        })
+            MenuItem("Others").also{items.add(it)}.setOnAction {
+                dialog("Info", VBox().apply {
+                    padding = Insets(16.0)
+                    minWidth = 400.0
+                    TextField().also{children.add(it)}.apply {
+                        isEditable = false
+                        style = "-fx-background-color: transparent; -fx-background-insets: 0px"
+                        text = "go-ipfs version: ${ipfs.version()}"
                     }
-                }
-                Menu("Gateway").also{items.add(it)}.apply {
-                    CheckMenuItem("Writable").also{items.add(it)}.apply {
-                        isSelected = config.getAsJsonObject("Gateway").run {
-                            if(!has("Writable")) false
-                            else getAsJsonPrimitive("Writable").asBoolean
+                    val addresses = config.getAsJsonObject("Addresses")
+                    TextField().also{children.add(it)}.apply {
+                        isEditable = false
+                        style = "-fx-background-color: transparent; -fx-background-insets: 0px"
+                        text = "API address: ${addresses.getAsJsonPrimitive("API").asString}"
+                    }
+                    TextField().also{children.add(it)}.apply {
+                        isEditable = false
+                        style = "-fx-background-color: transparent; -fx-background-insets: 0px"
+                        text = "Gateway address: ${addresses.getAsJsonPrimitive("Gateway").asString}"
+                    }
+                    Platform.runLater{requestFocus()}
+                })
+            }
+        }
+        Menu("Config").also{menus.add(it)}.apply {
+            MenuItem("Bootstrap").also{items.add(it)}.setOnAction {
+                dialog("Bootstrap", BorderPane().apply {
+                    minHeight = 500.0
+                    minWidth = 800.0
+                    top = StackPane().apply {
+                        padding = Insets(16.0, 16.0, 0.0, 16.0)
+                        Label("Edit Bootstrap").also{children.add(it)}.apply {
+                            font = Font.font(20.0)
                         }
-                        setOnAction { config{
-                            it.getAsJsonObject("Gateway").apply {
-                                remove("Writable")
-                                addProperty("Writable", isSelected)
-                            }
-                        } }
                     }
-                }
-                Menu("API").also{items.add(it)}.apply {
-                    Menu("HTTPHeaders").also{items.add(it)}.apply {
-                        MenuItem("Add origin...").also{items.add(it)}.apply {
+                    val area = TextArea().apply {
+                        padding = Insets(16.0, 16.0, 16.0, 16.0)
+                        style = "-fx-background-color: transparent; -fx-background-insets: 0px"
+                        background = Background.EMPTY
+                        isWrapText = false
+                        text = ipfs.bootstrap().joinToString("\n")
+                    }
+                    center = area
+                    bottom = StackPane().apply {
+                        padding = Insets(0.0, 16.0, 16.0, 16.0)
+                        Button("Apply").also{children.add(it)}.apply {
+                            style = "-fx-background-color: white"
+                            translateX = -40.0
                             setOnAction {
-                                dialog("Add origin", HBox().apply {
-                                    padding = Insets(16.0)
-                                    val action: (String) -> Unit = { origin ->
-                                        config {
-                                            it.getAsJsonObject("API").getAsJsonObject("HTTPHeaders").apply {
-                                                if(!has("Access-Control-Allow-Origin")) {
-                                                    add("Access-Control-Allow-Origin", JsonArray())
-                                                    getAsJsonArray("Access-Control-Allow-Origin").add("http://localhost:3000")
-                                                }
-                                                getAsJsonArray("Access-Control-Allow-Origin").add(origin)
-                                            }
-                                        }
-                                        scene.window.hide()
-                                    }
-                                    val input = TextField("").apply {
-                                        style = "-fx-background-color: white"
-                                        promptText = "http://..."
-                                        setOnAction{action(text)}
-                                    }.also { children.add(it) }
-                                    Button("Add").apply {
-                                        style = "-fx-background-color: white"
-                                        setOnAction {action(input.text)}
-                                    }.also { children.add(it) }
-                                })
+                                config{
+                                    val list = area.text.split("\n")
+                                    if(!it.has("Bootstrap")) it.remove("Bootstrap")
+                                    it.add("Bootstrap", JsonArray().apply{list.forEach{add(it)}})
+                                }
+                                scene.window.hide()
                             }
+                        }
+                        Button("Close").also{children.add(it)}.apply {
+                            style = "-fx-background-color: white"
+                            translateX = 40.0
+                            setOnAction { scene.window.hide() }
+                        }
+                    }
+                })
+            }
+            Menu("Gateway").also{items.add(it)}.apply {
+                CheckMenuItem("Writable").also{items.add(it)}.apply {
+                    isSelected = config.getAsJsonObject("Gateway").run {
+                        if(!has("Writable")) false
+                        else getAsJsonPrimitive("Writable").asBoolean
+                    }
+                    setOnAction { config{
+                        it.getAsJsonObject("Gateway").apply {
+                            remove("Writable")
+                            addProperty("Writable", isSelected)
+                        }
+                    } }
+                }
+            }
+            Menu("API").also{items.add(it)}.apply {
+                Menu("HTTP Headers").also{items.add(it)}.apply {
+                    MenuItem("Add origin...").also{items.add(it)}.apply {
+                        setOnAction {
+                            dialog("Add API origin", HBox().apply {
+                                padding = Insets(16.0)
+                                val action: (String) -> Unit = { origin ->
+                                    config {
+                                        it.getAsJsonObject("API").getAsJsonObject("HTTPHeaders").apply {
+                                            if(!has("Access-Control-Allow-Origin")) {
+                                                add("Access-Control-Allow-Origin", JsonArray())
+                                                getAsJsonArray("Access-Control-Allow-Origin")
+                                                        .add("http://localhost:3000")
+                                            }
+                                            getAsJsonArray("Access-Control-Allow-Origin").add(origin)
+                                        }
+                                    }
+                                    scene.window.hide()
+                                }
+                                val input = TextField("").apply {
+                                    minWidth = 300.0
+                                    style = "-fx-background-color: white"
+                                    promptText = "http://..."
+                                    setOnAction{action(text)}
+                                }.also { children.add(it) }
+                                Button("Add").apply {
+                                    style = "-fx-background-color: white"
+                                    setOnAction {action(input.text)}
+                                }.also { children.add(it) }
+                            })
                         }
                     }
                 }
             }
+            Menu("Experimental").also{items.add(it)}.apply {
+                CheckMenuItem("Filestore").also{items.add(it)}.apply {
+                    isSelected = config.getAsJsonObject("Experimental").run {
+                        if(!has("FilestoreEnabled")) false
+                        else getAsJsonPrimitive("FilestoreEnabled").asBoolean
+                    }
+                    setOnAction { config{
+                        it.getAsJsonObject("Experimental").apply {
+                            remove("FilestoreEnabled")
+                            addProperty("FilestoreEnabled", isSelected)
+                        }
+                    } }
+                }
+                CheckMenuItem("URL Store").also{items.add(it)}.apply {
+                    isSelected = config.getAsJsonObject("Experimental").run {
+                        if(!has("UrlstoreEnabled")) false
+                        else getAsJsonPrimitive("UrlstoreEnabled").asBoolean
+                    }
+                    setOnAction { config{
+                        it.getAsJsonObject("Experimental").apply {
+                            remove("UrlstoreEnabled")
+                            addProperty("UrlstoreEnabled", isSelected)
+                        }
+                    } }
+                }
+                CheckMenuItem("Sharding").also{items.add(it)}.apply {
+                    isSelected = config.getAsJsonObject("Experimental").run {
+                        if(!has("ShardingEnabled")) false
+                        else getAsJsonPrimitive("ShardingEnabled").asBoolean
+                    }
+                    setOnAction { config{
+                        it.getAsJsonObject("Experimental").apply {
+                            remove("ShardingEnabled")
+                            addProperty("ShardingEnabled", isSelected)
+                        }
+                    } }
+                }
+                CheckMenuItem("Libp2p Stream Mounting").also{items.add(it)}.apply {
+                    isSelected = config.getAsJsonObject("Experimental").run {
+                        if(!has("Libp2pStreamMounting")) false
+                        else getAsJsonPrimitive("Libp2pStreamMounting").asBoolean
+                    }
+                    setOnAction { config{
+                        it.getAsJsonObject("Experimental").apply {
+                            remove("Libp2pStreamMounting")
+                            addProperty("Libp2pStreamMounting", isSelected)
+                        }
+                    } }
+                }
+            }
         }
+    }
+
+    var log = TextArea()
+    fun console(){
 
         content.setOnDragOver { it.acceptTransferModes(*TransferMode.ANY); }
         content.setOnDragDropped here@{
             val drag = it.dragboard
             if(!drag.hasFiles()) return@here
             open(drag.files.singleOrNull() ?: return@here);
-        }
-
-        FadeTransition(Duration(2000.0), status).apply {
-            fromValue = 1.0
-            toValue = 0.0
-            play()
         }
 
         log.apply {
@@ -548,7 +695,7 @@ class IPFSManager : Application() {
             this.title = title
             isAlwaysOnTop = true
             initModality(Modality.WINDOW_MODAL)
-            scene = Scene(pane)
+            scene = Scene(pane).apply { stylesheets.add(stylesheet) }
             show()
         }
     }
