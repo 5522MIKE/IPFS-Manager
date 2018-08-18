@@ -208,12 +208,24 @@ class IPFSManager : Application() {
     fun console(){
         status.text = "Connected"
 
+
+
         val menu = MenuBar().also{body.top = it}.apply {
             style = "-fx-background-color: transparent"
+            Menu("Other").also{menus.add(it)}.apply {
+                MenuItem("Info").also{items.add(it)}.setOnAction {
+                    dialog("Info", StackPane().apply {
+                        padding = Insets(16.0)
+                        Label(ipfs.version()).also{children.add(it)}.apply {
+
+                        }
+                    })
+                }
+            }
             Menu("Config").also{menus.add(it)}.apply {
                 Menu("Identity").also{items.add(it)}.apply {
-                    MenuItem("PeerID").also{items.add(it)}.apply {
-                        setOnAction { dialog("PeerID", StackPane().apply {
+                    MenuItem("PeerID").also{items.add(it)}.setOnAction {
+                        dialog("PeerID", StackPane().apply {
                             padding = Insets(16.0)
                             val id = config.getAsJsonObject("Identity").getAsJsonPrimitive("PeerID").asString
                             Label(id).also{children.add(it)}.apply {
@@ -232,7 +244,7 @@ class IPFSManager : Application() {
                                     }
                                 }
                             }
-                        }) }
+                        })
                     }
                 }
                 Menu("Gateway").also{items.add(it)}.apply {
