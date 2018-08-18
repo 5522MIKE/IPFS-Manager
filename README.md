@@ -44,9 +44,11 @@
 
 You need [Java](https://java.com/download/) (It works with Java 8, Java 9 and Java 10)
 
-- [Windows](https://github.com/RHazDev/IPFS-Manager/raw/master/exe/ipfs-manager-1.2.7.exe)
+- [Windows](https://github.com/RHazDev/IPFS-Manager/raw/master/setup/ipfs-manager-setup.exe)
 
-- [Linux, MacOS, Freebsd](https://github.com/RHazDev/IPFS-Manager/raw/master/jar/ipfs-manager-1.2.7.jar)
+- [Windows (single file)](https://github.com/RHazDev/IPFS-Manager/raw/master/exe/ipfs-manager-1.2.8.exe)
+
+- [Linux, MacOS, Freebsd](https://github.com/RHazDev/IPFS-Manager/raw/master/jar/ipfs-manager-1.2.8.jar)
 
 ### Screenshots
 ![](https://i.imgur.com/AJ0Ge3b.png)
