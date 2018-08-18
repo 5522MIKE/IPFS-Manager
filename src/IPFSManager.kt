@@ -320,7 +320,8 @@ class IPFSManager : Application() {
                         style = "-fx-background-color: transparent; -fx-background-insets: 0px"
                         background = Background.EMPTY
                         isWrapText = false
-                        text = ipfs.bootstrap().joinToString("\n")
+                        text = if(!config.has("Bootstrap")) ""
+                            else config.getAsJsonArray("Bootstrap").map{it.asString}.joinToString("\n")
                     }
                     center = area
                     bottom = StackPane().apply {
@@ -330,7 +331,7 @@ class IPFSManager : Application() {
                             translateX = -40.0
                             setOnAction {
                                 config{
-                                    val list = area.text.split("\n")
+                                    val list = area.text.split("\n").filterNot{it.isEmpty()}
                                     if(!it.has("Bootstrap")) it.remove("Bootstrap")
                                     it.add("Bootstrap", JsonArray().apply{list.forEach{add(it)}})
                                 }
