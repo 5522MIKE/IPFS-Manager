@@ -91,7 +91,8 @@ class IPFSManager : Application() {
     }
 
     fun update() {
-        val conn = URL("https://raw.githubusercontent.com/RHazDev/IPFS-Manager/master/version.json").openConnection()
+        val conn = "https://raw.githubusercontent.com/RHazDev/IPFS-Manager/master/resources/version.json"
+                    .let{URL(it)}.openConnection()
         val json = InputStreamReader(conn.inputStream).let{ JsonParser().parse(it).asJsonObject}
         val version = json.getAsJsonPrimitive("version").asString
         val url = json.getAsJsonPrimitive("url").asString
@@ -99,9 +100,10 @@ class IPFSManager : Application() {
         val myversion = JsonParser().parse(local).asJsonObject.getAsJsonPrimitive("version").asString
         if(version newerThan myversion)
             dialog("Update", StackPane().apply {
-                Label("A new version is available").also{children.add(it)}.apply {
+                padding = Insets(32.0)
+                Label("A new version is available: $version").also{children.add(it)}.apply {
                     translateY = -20.0
-                    font = Font.font(20.0)
+                    font = Font.font(16.0)
                 }
                 Button("Download").also{children.add(it)}.apply {
                     translateY = 20.0
