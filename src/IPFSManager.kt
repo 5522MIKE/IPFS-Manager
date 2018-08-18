@@ -47,7 +47,9 @@ import java.awt.event.ActionListener
 import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
+import java.io.InputStreamReader
 import java.net.URI
+import java.net.URL
 import java.net.URLClassLoader
 import java.nio.file.Files
 import java.util.*
@@ -76,6 +78,7 @@ class IPFSManager : Application() {
         get() = IPFSManager::class.java.classLoader.getResource("style.css").toExternalForm()
 
     val Window: Stage.() -> Unit = {
+        try{update()}catch(ex:Exception){}
         Platform.setImplicitExit(false)
         tray()
         icons.add(Image(icon))
@@ -84,6 +87,38 @@ class IPFSManager : Application() {
         minHeight = 400.0
         scene = Scene(body, minWidth, minHeight).apply {
             stylesheets.add(stylesheet)
+        }
+    }
+
+    fun update() {
+        val conn = URL("https://raw.githubusercontent.com/RHazDev/IPFS-Manager/master/version.json").openConnection()
+        val json = InputStreamReader(conn.inputStream).let{ JsonParser().parse(it).asJsonObject}
+        val version = json.getAsJsonPrimitive("version").asString
+        val url = json.getAsJsonPrimitive("url").asString
+        val local = InputStreamReader(IPFSManager::class.java.classLoader.getResourceAsStream("version.json"))
+        val myversion = JsonParser().parse(local).asJsonObject.getAsJsonPrimitive("version").asString
+        if(version newerThan myversion)
+            dialog("Update", StackPane().apply {
+                Label("A new version is available").also{children.add(it)}.apply {
+                    translateY = -20.0
+                    font = Font.font(20.0)
+                }
+                Button("Download").also{children.add(it)}.apply {
+                    translateY = 20.0
+                    style = "-fx-background-color: white"
+                    setOnAction { Desktop.getDesktop().browse(URI(url)) }
+                }
+            })
+    }
+
+    infix fun String.newerThan(v: String): Boolean = false.also{
+        val s1 = split('.');
+        val s2 = v.split('.');
+        for(i in 0..Math.max(s1.size,s2.size)){
+            if(i !in s1.indices) return false; // If there is no digit, v2 is automatically bigger
+            if(i !in s2.indices) return true; // if there is no digit, v1 is automatically bigger
+            if(s1[i] > s2[i]) return true;
+            if(s1[i] < s2[i]) return false;
         }
     }
 
