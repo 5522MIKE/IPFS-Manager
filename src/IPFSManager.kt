@@ -279,7 +279,32 @@ class IPFSManager : Application() {
     }
 
     fun menu() = MenuBar().also{body.top = it}.apply {
+        val notimpl = {dialog("IPFS Manager", StackPane().apply {
+            padding = Insets(32.0)
+            Label("Not yet implemented!").also{children.add(it)}.apply {
+                translateY = -20.0
+                font = Font.font(20.0)
+            }
+            Label("coming soon... :)").also{children.add(it)}.apply{
+                translateY = 20.0
+            }
+        })}
         style = "-fx-background-color: transparent"
+        Menu("Action").also{menus.add(it)}.apply{
+            MenuItem("Add...").also{items.add(it)}.setOnAction{notimpl()}
+            MenuItem("Pins management").also{items.add(it)}.setOnAction{notimpl()}
+            MenuItem("Keys management").also{items.add(it)}.setOnAction{notimpl()}
+            MenuItem("Pub/Sub").also{items.add(it)}.setOnAction{notimpl()}
+            Menu("Swarm").also{items.add(it)}.apply {
+                MenuItem("Connect to...").also{items.add(it)}.setOnAction{notimpl()}
+                MenuItem("Disconnect from...").also{items.add(it)}.setOnAction{notimpl()}
+            }
+            Menu("DHT").also{items.add(it)}.apply {
+                MenuItem("Find peer...").also{items.add(it)}.setOnAction{notimpl()}
+                MenuItem("Find provs...").also{items.add(it)}.setOnAction{notimpl()}
+                MenuItem("Query...").also{items.add(it)}.setOnAction{notimpl()}
+            }
+        }
         Menu("Info").also{menus.add(it)}.apply {
             Menu("Identity").also{items.add(it)}.apply {
                 MenuItem("PeerID").also{items.add(it)}.setOnAction {
@@ -317,6 +342,7 @@ class IPFSManager : Application() {
                     })
                 }
             }
+            MenuItem("Peers").also{items.add(it)}.setOnAction{notimpl()}
             MenuItem("Others").also{items.add(it)}.setOnAction {
                 dialog("Info", VBox().apply {
                     padding = Insets(16.0)
