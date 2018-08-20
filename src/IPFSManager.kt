@@ -10,7 +10,8 @@ import com.google.zxing.client.j2se.MatrixToImageWriter
 import com.google.zxing.qrcode.QRCodeWriter
 import com.sun.java.accessibility.util.AWTEventMonitor.addActionListener
 import io.ipfs.api.IPFS
-import io.ipfs.api.NamedStreamable.FileWrapper
+import io.ipfs.api.NamedStreamable
+import io.ipfs.api.NamedStreamable.*
 import io.ipfs.multihash.Multihash
 import javafx.animation.FadeTransition
 import javafx.application.Application
@@ -106,22 +107,12 @@ class IPFSManager : Application() {
                     font = Font.font(16.0)
                 }
                 Button("Download").also{children.add(it)}.apply {
+                    cursor = Cursor.HAND
                     translateY = 20.0
                     style = "-fx-background-color: white"
                     setOnAction { Desktop.getDesktop().browse(URI(url)) }
                 }
             })
-    }
-
-    infix fun String.newerThan(v: String): Boolean = false.also{
-        val s1 = split('.');
-        val s2 = v.split('.');
-        for(i in 0..Math.max(s1.size,s2.size)){
-            if(i !in s1.indices) return false; // If there is no digit, v2 is automatically bigger
-            if(i !in s2.indices) return true; // if there is no digit, v1 is automatically bigger
-            if(s1[i] > s2[i]) return true;
-            if(s1[i] < s2[i]) return false;
-        }
     }
 
     fun tray() {
@@ -255,6 +246,7 @@ class IPFSManager : Application() {
             println(ipfsd.store.parentFile.name)
             status.text = "Could not find .ipfs folder"
             Button("Choose...").also{content.children.add(it)}.apply {
+                cursor = Cursor.HAND
                 style = "-fx-background-color: white"
                 translateX = -80.0
                 translateY = 20.0
@@ -267,6 +259,7 @@ class IPFSManager : Application() {
                 }
             }
             Button("Continue anyway").also{content.children.add(it)}.apply {
+                cursor = Cursor.HAND
                 style = "-fx-background-color: white"
                 translateX = 80.0
                 translateY = 20.0
@@ -291,7 +284,12 @@ class IPFSManager : Application() {
         })}
         style = "-fx-background-color: transparent"
         Menu("Action").also{menus.add(it)}.apply{
-            MenuItem("Add...").also{items.add(it)}.setOnAction{notimpl()}
+            MenuItem("Add files...").also{items.add(it)}.setOnAction{
+                FileChooser().showOpenMultipleDialog(window).let(open)
+            }
+            MenuItem("Add folder...").also{items.add(it)}.setOnAction{
+                open(listOf(DirectoryChooser().showDialog(window)))
+            }
             MenuItem("Pins management").also{items.add(it)}.setOnAction{notimpl()}
             MenuItem("Keys management").also{items.add(it)}.setOnAction{notimpl()}
             MenuItem("Pub/Sub").also{items.add(it)}.setOnAction{notimpl()}
@@ -390,6 +388,7 @@ class IPFSManager : Application() {
                     bottom = StackPane().apply {
                         padding = Insets(0.0, 16.0, 16.0, 16.0)
                         Button("Apply").also{children.add(it)}.apply {
+                            cursor = Cursor.HAND
                             style = "-fx-background-color: white"
                             translateX = -40.0
                             setOnAction {
@@ -402,6 +401,7 @@ class IPFSManager : Application() {
                             }
                         }
                         Button("Close").also{children.add(it)}.apply {
+                            cursor = Cursor.HAND
                             style = "-fx-background-color: white"
                             translateX = 40.0
                             setOnAction { scene.window.hide() }
@@ -449,12 +449,79 @@ class IPFSManager : Application() {
                                     setOnAction{action(text)}
                                 }.also { children.add(it) }
                                 Button("Add").apply {
+                                    cursor = Cursor.HAND
                                     style = "-fx-background-color: white"
                                     setOnAction {action(input.text)}
                                 }.also { children.add(it) }
                             })
                         }
                     }
+                }
+            }
+            Menu("Reprovider").also{items.add(it)}.apply {
+                MenuItem("Interval").also{items.add(it)}.setOnAction {
+                    dialog("Reprovider Interval", StackPane().apply {
+                        padding = Insets(32.0)
+                        Label("Reprovider Interval").also{children.add(it)}.apply{
+                            font = Font.font(20.0)
+                            translateY = -20.0
+                        }
+                        HBox().also{children.add(it)}.apply {
+                            translateY = 20.0
+                            alignment = Pos.CENTER
+                            val field = TextField().also { children.add(it) }.apply {
+                                maxWidth = 100.0
+                                style = "-fx-background-color: white"
+                                text = config.getAsJsonObject("Reprovider")
+                                        .getAsJsonPrimitive("Interval").asString
+                                setOnAction{config{
+                                    it.getAsJsonObject("Reprovider").apply {
+                                        remove("Interval")
+                                        add("Interval", JsonPrimitive(text))
+                                    }
+                                    scene.window.hide()
+                                }}
+                            }
+                            Button("Apply").also{children.add(it)}.apply {
+                                cursor = Cursor.HAND
+                                style = "-fx-background-color: white"
+                                isDefaultButton = true
+                                setOnAction{field.onAction}
+                            }
+                        }
+                    })
+                }
+                MenuItem("Strategy").also{items.add(it)}.setOnAction {
+                    dialog("Reprovider Strategy", StackPane().apply {
+                        padding = Insets(32.0)
+                        Label("Reprovider Strategy").also{children.add(it)}.apply{
+                            font = Font.font(20.0)
+                            translateY = -20.0
+                        }
+                        HBox().also{children.add(it)}.apply {
+                            translateY = 20.0
+                            alignment = Pos.CENTER
+                            val list = FXCollections.observableArrayList("all", "pinned", "roots")
+                            val box = ComboBox(list).also { children.add(it) }.apply {
+                                maxWidth = 100.0
+                                style = "-fx-background-color: white"
+                                value = config.getAsJsonObject("Reprovider")
+                                        .getAsJsonPrimitive("Strategy").asString
+                            }
+                            Button("Apply").also{children.add(it)}.apply {
+                                cursor = Cursor.HAND
+                                style = "-fx-background-color: white"
+                                isDefaultButton = true
+                                setOnAction{config{
+                                    it.getAsJsonObject("Reprovider").apply {
+                                        remove("Strategy")
+                                        add("Strategy", JsonPrimitive(box.value))
+                                    }
+                                    scene.window.hide()
+                                }}
+                            }
+                        }
+                    })
                 }
             }
             Menu("Experimental").also{items.add(it)}.apply {
@@ -517,7 +584,7 @@ class IPFSManager : Application() {
         content.setOnDragDropped here@{
             val drag = it.dragboard
             if(!drag.hasFiles()) return@here
-            open(drag.files.singleOrNull() ?: return@here);
+            open(drag.files.singleOrNull()?.let{listOf(it)} ?: return@here);
         }
 
         log.apply {
@@ -553,10 +620,18 @@ class IPFSManager : Application() {
         get() = FXCollections.observableArrayList(ipfs.key.list().map {"${it.name} (${it.id.toBase58()})"})
                 .apply { add("Create new key") }
 
-    val open: (File) -> Unit = content@{ file -> dialog(file.name, StackPane().apply {
+    val List<File>.name
+        get() = joinToString(", "){it.name}
+
+    val open: (List<File>) -> Unit = content@{ files -> dialog(files.name, StackPane().apply {
         minHeight = 150.0
         minWidth = 300.0
         padding = Insets(16.0)
+        val wrapper =
+            if(files.size == 1)
+                FileWrapper(files[0])
+            else
+                DirWrapper(files.name, files.map{FileWrapper(it)})
         Label("Wrap into a directory?").apply {
             translateY = -20.0
             font = Font.font(20.0)
@@ -570,7 +645,7 @@ class IPFSManager : Application() {
             isDefaultButton = true
             setOnAction {
                 scene.window.hide()
-                ipfs.add(FileWrapper(file), true)[1].hash.also { info(file, it) }
+                ipfs.add(wrapper, true)[1].hash.also { info(files, it) }
             }
         }.also { children.add(it) }
         Button("No").apply {
@@ -582,13 +657,13 @@ class IPFSManager : Application() {
             isCancelButton = true
             setOnAction {
                 scene.window.hide()
-                ipfs.add(FileWrapper(file), false)[0].hash.also { info(file, it) }
+                ipfs.add(wrapper, false)[0].hash.also { info(files, it) }
             }
         }.also { children.add(it) }
     })}
 
-    val info: (File, Multihash) -> Unit = content@{ file, hash ->
-        dialog(file.name, StackPane().apply{
+    val info: (List<File>, Multihash) -> Unit = content@{ files, hash ->
+        dialog(files.name, StackPane().apply{
             var url = "https://ipfs.io/ipfs/$hash"
             padding = Insets(32.0)
             minHeight = 400.0
@@ -633,7 +708,7 @@ class IPFSManager : Application() {
                 translateY = -90.0
                 style = "-fx-background-color: white"
                 setOnAction {
-                    dialog(file.name, StackPane().apply dialog@{
+                    dialog(files.name, StackPane().apply dialog@{
                         minHeight = 200.0
                         minWidth = 400.0
                         val txt = Label("Publish to:").apply {
@@ -832,4 +907,15 @@ open class KScript(val name: String) {
 
 abstract class Task(name: String): KScript(name){
     abstract fun onCall(line: String)
+}
+
+infix fun String.newerThan(v: String): Boolean = false.also{
+    val s1 = split('.');
+    val s2 = v.split('.');
+    for(i in 0..Math.max(s1.size,s2.size)){
+        if(i !in s1.indices) return false; // If there is no digit, v2 is automatically bigger
+        if(i !in s2.indices) return true; // if there is no digit, v1 is automatically bigger
+        if(s1[i].toInt() > s2[i].toInt()) return true;
+        if(s1[i].toInt() < s2[i].toInt()) return false;
+    }
 }
