@@ -621,7 +621,9 @@ class IPFSManager : Application() {
                 .apply { add("Create new key") }
 
     val List<File>.name
-        get() = joinToString(", "){it.name}
+        get() = joinToString(", "){it.name}.run {
+            if(length < 20) this else substring(0, 20)+"..."
+        }
 
     val open: (List<File>) -> Unit = content@{ files -> dialog(files.name, StackPane().apply {
         minHeight = 150.0
@@ -645,7 +647,9 @@ class IPFSManager : Application() {
             isDefaultButton = true
             setOnAction {
                 scene.window.hide()
-                ipfs.add(wrapper, true)[1].hash.also { info(files, it) }
+                val i = ipfs.add(wrapper, true)
+                println(i.map { it.hash.toBase58() })
+                i.last().hash.also { info(files, it) }
             }
         }.also { children.add(it) }
         Button("No").apply {
@@ -657,7 +661,9 @@ class IPFSManager : Application() {
             isCancelButton = true
             setOnAction {
                 scene.window.hide()
-                ipfs.add(wrapper, false)[0].hash.also { info(files, it) }
+                val i = ipfs.add(wrapper, false)
+                println(i.map { it.hash.toBase58() })
+                i.last().hash.also { info(files, it) }
             }
         }.also { children.add(it) }
     })}
