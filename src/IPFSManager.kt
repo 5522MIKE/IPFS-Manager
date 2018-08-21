@@ -194,6 +194,7 @@ class IPFSManager : Application() {
 
     val ipfsd by lazy {
         IPFSDaemon().apply {
+            args = arrayOf("--enable-pubsub-experiment")
             listeners.onDownloading.add(Runnable {
                 Platform.runLater {status.text = "Downloading..."}
             })
