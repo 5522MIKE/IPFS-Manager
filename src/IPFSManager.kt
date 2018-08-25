@@ -10,6 +10,7 @@ import com.google.zxing.client.j2se.MatrixToImageWriter
 import com.google.zxing.qrcode.QRCodeWriter
 import com.sun.java.accessibility.util.AWTEventMonitor.addActionListener
 import io.ipfs.api.IPFS
+import io.ipfs.api.MerkleNode
 import io.ipfs.api.NamedStreamable
 import io.ipfs.api.NamedStreamable.*
 import io.ipfs.multihash.Multihash
@@ -584,8 +585,7 @@ class IPFSManager : Application() {
         content.setOnDragOver { it.acceptTransferModes(*TransferMode.ANY); }
         content.setOnDragDropped here@{
             val drag = it.dragboard
-            if(!drag.hasFiles()) return@here
-            open(drag.files.singleOrNull()?.let{listOf(it)} ?: return@here);
+            if(drag.hasFiles()) open(drag.files);
         }
 
         log.apply {
@@ -631,10 +631,8 @@ class IPFSManager : Application() {
         minWidth = 300.0
         padding = Insets(16.0)
         val wrapper =
-            if(files.size == 1)
-                FileWrapper(files[0])
-            else
-                DirWrapper(files.name, files.map{FileWrapper(it)})
+            if(files.size == 1) FileWrapper(files[0])
+            else DirWrapper(files.name, files.map{FileWrapper(it)})
         Label("Wrap into a directory?").apply {
             translateY = -20.0
             font = Font.font(20.0)
@@ -648,7 +646,9 @@ class IPFSManager : Application() {
             isDefaultButton = true
             setOnAction {
                 scene.window.hide()
-                val i = ipfs.add(wrapper, true)
+                var i: List<MerkleNode>? = null
+                while(i == null) try {i = ipfs.add(wrapper, true)}
+                catch(ex: NullPointerException){}
                 println(i.map { it.hash.toBase58() })
                 i.last().hash.also { info(files, it) }
             }
@@ -662,16 +662,18 @@ class IPFSManager : Application() {
             isCancelButton = true
             setOnAction {
                 scene.window.hide()
-                val i = ipfs.add(wrapper, false)
-                println(i.map { it.hash.toBase58() })
-                i.last().hash.also { info(files, it) }
+                var i: List<MerkleNode>? = null
+                while(i == null) try {i = ipfs.add(wrapper, false)}
+                catch(ex: NullPointerException){}
+                println(i!!.map { it.hash.toBase58() })
+                i!!.last().hash.also { info(files, it) }
             }
         }.also { children.add(it) }
     })}
 
     val info: (List<File>, Multihash) -> Unit = content@{ files, hash ->
         dialog(files.name, StackPane().apply{
-            var url = "https://ipfs.io/ipfs/$hash"
+            val url = "https://ipfs.io/ipfs/$hash"
             padding = Insets(32.0)
             minHeight = 400.0
             minWidth = 400.0
@@ -686,8 +688,8 @@ class IPFSManager : Application() {
                 fun switch() = when(switch++%4){
                     0 -> text = "$hash"
                     1 -> text = "http://ipfs.io/ipfs/$hash"
-                    2 -> text = "ipfs://$hash"
-                    3 -> text = "/ipfs/$hash"
+                    2 -> text = "/ipfs/$hash"
+                    3 -> text = "ipfs://$hash"
                     else -> {}
                 }
                 var last: Thread? = null
@@ -710,17 +712,40 @@ class IPFSManager : Application() {
                     }
                 }
             }.also { children.add(it) }
-            Button("Publish to...").apply {
+            Button("Unpin").also{children+=it}.apply {
                 cursor = Cursor.HAND
                 translateY = -90.0
+                translateX = -40.0
+                style = "-fx-background-color: white"
+                var pinned = true
+                setOnAction {
+                    when(pinned){
+                        true -> {
+                            ipfs.pin.rm(hash);
+                            pinned = false
+                            text = "Pin"
+                        }
+                        false -> {
+                            ipfs.pin.add(hash);
+                            pinned = true
+                            text = "Unpin"
+                        }
+                    }
+
+                }
+            }
+            Button("Publish to...").also{children+=it}.apply {
+                cursor = Cursor.HAND
+                translateY = -90.0
+                translateX = 40.0
                 style = "-fx-background-color: white"
                 setOnAction {
                     dialog(files.name, StackPane().apply dialog@{
-                        minHeight = 200.0
+                        minHeight = 150.0
                         minWidth = 400.0
                         val txt = Label("Publish to:").apply {
                             translateY = -40.0
-                            padding = Insets(16.0)
+                            padding = Insets(32.0)
                             font = Font.font(20.0)
                         }.also { children.add(it) }
                         HBox().apply hbox@{
@@ -768,17 +793,24 @@ class IPFSManager : Application() {
                                 isDefaultButton = true
                                 setOnAction {
                                     this@dialog.cursor = Cursor.WAIT
-                                    val id = box.value.split(" ")[0]
-                                    txt.text = "Publishing to $id..."
-                                    txt.translateY = -30.0
                                     this@dialog.children.remove(this@hbox)
-                                    val hint = Label("please wait")
-                                    this@dialog.children.add(hint)
+                                    val id = box.value.split(" ")[0]
+
+                                    txt.apply {
+                                        text = "Publishing to $id..."
+                                        translateY = -20.0
+                                    }
+                                    val hint = Label().also{this@dialog.children += it}.apply {
+                                        text = "please wait"
+                                        translateY = 20.0
+                                    }
+
                                     val task = async(300, {
                                         ipfs.name.publish(hash, Optional.of(id))["Name"]
                                     }, { hash ->
                                         this@dialog.cursor = Cursor.DEFAULT
-                                        val url = "https://ipfs.io/ipns/$hash"
+                                        val url =
+                                            "https://ipfs.io/ipfs/QmRyeA1xCjreUgbSCc4QLhYzfRnnPGyfQTMuxpf6kUYXoX/#$hash"
                                         hint.text = "Double-click to open         Right click to copy"
                                         txt.apply {
                                             cursor = Cursor.HAND
@@ -786,8 +818,8 @@ class IPFSManager : Application() {
                                             fun switch() = when(switch++%4){
                                                 0 -> text = "$hash"
                                                 1 -> text = "http://ipfs.io/ipns/$hash"
-                                                2 -> text = "ipns://$hash"
-                                                3 -> text = "/ipns/$hash"
+                                                2 -> text = "/ipns/$hash"
+                                                3 -> text = "ipns://$hash"
                                                 else -> {}
                                             }
                                             var last: Thread? = null
@@ -806,6 +838,7 @@ class IPFSManager : Application() {
                                             }}
                                             text = "$hash"
                                         }
+                                        this@dialog.layout()
                                     }, {
                                         this@dialog.cursor = Cursor.DEFAULT
                                         txt.text = "Error!"
@@ -815,7 +848,7 @@ class IPFSManager : Application() {
                         }.also { children.add(it) }
                     })
                 }
-            }.also { children.add(it) }
+            }
             StackPane().apply {
                 translateY = 60.0
                 maxHeight = 200.0
