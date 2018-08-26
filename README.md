@@ -24,7 +24,7 @@
 
 - Supports all IPFS actions
 
-- Command-Line + Graphical
+- Command-Line and Graphical interfaces
 
 - You can create scripts and tasks in Kotlin
 
@@ -34,7 +34,9 @@
 
 - Publish to IPNS
 
-- Create IPNS keys
+- Manage keys
+
+- Manage pins
 
 - Generates QR codes
 
