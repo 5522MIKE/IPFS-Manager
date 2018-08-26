@@ -6,10 +6,12 @@ import com.google.gson.*
 import com.google.gson.stream.JsonWriter
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
+import com.google.zxing.client.j2se.MatrixToImageConfig
 import com.google.zxing.client.j2se.MatrixToImageWriter
 import com.google.zxing.qrcode.QRCodeWriter
 import com.sun.java.accessibility.util.AWTEventMonitor.addActionListener
 import io.ipfs.api.IPFS
+import io.ipfs.api.IPFS.PinType.*
 import io.ipfs.api.MerkleNode
 import io.ipfs.api.NamedStreamable
 import io.ipfs.api.NamedStreamable.*
@@ -17,6 +19,7 @@ import io.ipfs.multihash.Multihash
 import javafx.animation.FadeTransition
 import javafx.application.Application
 import javafx.application.Platform
+import javafx.beans.property.ReadOnlyObjectWrapper
 import javafx.collections.FXCollections
 import javafx.embed.swing.SwingFXUtils
 import javafx.event.EventHandler
@@ -56,6 +59,9 @@ import java.net.URLClassLoader
 import java.nio.file.Files
 import java.util.*
 import javax.imageio.ImageIO
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TableView.*
 
 fun main(args: Array<String>) {
     Application.launch(IPFSManager::class.java, *args)
@@ -292,8 +298,161 @@ class IPFSManager : Application() {
             MenuItem("Add folder...").also{items.add(it)}.setOnAction{
                 open(listOf(DirectoryChooser().showDialog(window)))
             }
-            MenuItem("Pins management").also{items.add(it)}.setOnAction{notimpl()}
-            MenuItem("Keys management").also{items.add(it)}.setOnAction{notimpl()}
+            MenuItem("Pins management").also{items.add(it)}.setOnAction{
+                dialog("Pins management", BorderPane().apply {
+                    minHeight = 500.0
+                    minWidth = 800.0
+                    top = StackPane().apply {
+                        padding = Insets(16.0, 16.0, 0.0, 16.0)
+                        Label("Pins Management").also{children.add(it)}.apply {
+                            font = Font.font(20.0)
+                        }
+                    }
+                    val table = TableView<Multihash>().apply {
+                        padding = Insets(16.0, 16.0, 16.0, 16.0)
+                        style = "-fx-background-color: transparent; -fx-background-insets: 0px"
+                        background = Background.EMPTY
+                        columnResizePolicy = CONSTRAINED_RESIZE_POLICY
+                        TableColumn<Multihash, String>("Hash").also{columns+=it}.apply {
+                            setCellValueFactory { ReadOnlyObjectWrapper(it.value.toBase58()) }
+                        }
+                        setRowFactory {
+                            TableRow<Multihash>().apply {
+                                setOnMouseClicked {
+                                    if(it.clickCount > 1) ipfs(item.toBase58(), item)
+                                }
+                            }
+                        }
+                        items.addAll(ipfs.pin.ls(recursive).keys)
+                    }
+                    center = table
+                    bottom = StackPane().apply {
+                        padding = Insets(0.0, 16.0, 16.0, 16.0)
+                        Button("Close").also{children.add(it)}.apply {
+                            cursor = Cursor.HAND
+                            style = "-fx-background-color: white"
+                            setOnAction { scene.window.hide() }
+                        }
+                    }
+                })
+            }
+            MenuItem("Keys management").also{items.add(it)}.setOnAction{
+                dialog("Keys management", StackPane().apply {
+                    padding = Insets(32.0)
+                    minHeight = 160.0
+                    Label("Keys management").also{children+=it}.apply {
+                        font = Font.font(20.0)
+                        translateY = -40.0
+                    }
+                    val box = ComboBox(keys).also{children+=it}.apply{
+                        cursor = Cursor.HAND
+                        style = "-fx-background-color: white"
+                        value = keys[0]
+                        maxWidth = 200.0
+                    }
+                    Button("Open").also{children+=it}.apply {
+                        cursor = Cursor.HAND
+                        style = "-fx-background-color: white"
+                        isDefaultButton = true
+                        translateY = 40.0
+                        translateX = -60.0
+                        setOnAction {
+                            val id = box.value.split(" ")[0]
+                            val hash = box.value.split(" ")[1].run{substring(1, length-1)}
+                            ipns(id, hash)
+                        }
+                    }
+                    val rename = Button("Rename").also{children+=it}.apply {
+                        isDisable = true
+                        cursor = Cursor.HAND
+                        style = "-fx-background-color: white"
+                        isDefaultButton = true
+                        translateY = 40.0
+                        setOnAction {
+                            val id = box.value.split(" ")[0]
+                            dialog("Rename $id", HBox().apply dialog@{
+                                padding = Insets(16.0)
+                                val field = TextField(id).also{children+=it}.apply {
+                                    style = "-fx-background-color: white"
+                                    textProperty().addListener { _,_,new ->
+                                        text = new.replace(Regex("[^a-zA-Z]"), "").toLowerCase()
+                                    }
+                                }
+                                val action = {
+                                    this@dialog.cursor = Cursor.WAIT
+                                    async(60,{
+                                        ipfs.key.rename(id, field.text)
+                                    }, {
+                                        scene.window.hide()
+                                        box.selectionModel.select(0)
+                                        box.items = keys
+                                    }, {this@dialog.cursor = Cursor.DEFAULT})
+                                }
+                                field.setOnAction{action()}
+                                Button("Create").apply {
+                                    cursor = Cursor.HAND
+                                    style = "-fx-background-color: white"
+                                    isDefaultButton = true
+                                    setOnAction{action()}
+                                }.also { children.add(it) }
+                            })
+                        }
+                    }
+                    val delete = Button("Delete").also{children+=it}.apply {
+                        isDisable = true
+                        cursor = Cursor.HAND
+                        style = "-fx-background-color: white"
+                        isDefaultButton = true
+                        translateY = 40.0
+                        translateX = 60.0
+                        setOnAction {
+                            val id = box.value.split(" ")[0]
+                            ipfs.key.rm(id)
+                            box.selectionModel.select(0)
+                            box.items = keys
+                        }
+                    }
+                    box.selectionModel.selectedItemProperty().addListener { _,_,value ->
+                        if(value.split(" ")[0] == "self") {
+                            rename.isDisable = true
+                            delete.isDisable = true
+                        }
+                        else {
+                            rename.isDisable = false
+                            delete.isDisable = false
+                        }
+                        if(value != "Create new key") return@addListener
+                        dialog(value, HBox().apply dialog@{
+                            padding = Insets(16.0)
+                            val id = TextField("")
+                            val action = {
+                                this@dialog.cursor = Cursor.WAIT
+                                async(60,{
+                                    ipfs.key.gen(id.text, Optional.of("rsa"), Optional.of("2048"))
+                                }, {
+                                    scene.window.hide()
+                                    box.selectionModel.select(0)
+                                    box.items = keys
+                                }, {this@dialog.cursor = Cursor.DEFAULT})
+                            }
+                            id.apply {
+                                style = "-fx-background-color: white"
+                                promptText = "id"
+                                textProperty().addListener { _,_,new ->
+                                    text = new.replace(Regex("[^a-zA-Z]"), "").toLowerCase()
+                                }
+                                setOnAction{action()}
+                            }.also { children.add(it) }
+                            Button("Create").apply {
+                                cursor = Cursor.HAND
+                                style = "-fx-background-color: white"
+                                isDefaultButton = true
+                                setOnAction{action()}
+                            }.also { children.add(it) }
+                        })
+                    }
+                })
+            }
             MenuItem("Pub/Sub").also{items.add(it)}.setOnAction{notimpl()}
             Menu("Swarm").also{items.add(it)}.apply {
                 MenuItem("Connect to...").also{items.add(it)}.setOnAction{notimpl()}
@@ -579,6 +738,52 @@ class IPFSManager : Application() {
         }
     }
 
+    fun ipns(id: String, hash: String) = dialog(id, StackPane().apply {
+        val url = "https://ipfs.io/ipfs/QmRyeA1xCjreUgbSCc4QLhYzfRnnPGyfQTMuxpf6kUYXoX/#$hash"
+        padding = Insets(32.0)
+        minHeight = 350.0
+        minWidth = 400.0
+        val hint = Label().also{children+=it}.apply {
+            translateY = -90.0
+            text = "Double-click to open         Right click to copy"
+        }
+        Label(hash).also{children+=it}.apply {
+            translateY = -120.0
+            font = Font.font(20.0)
+            cursor = Cursor.HAND
+            var switch = 1
+            fun switch() = when(switch++%4){
+                0 -> text = hash
+                1 -> text = "http://ipfs.io/ipns/$hash"
+                2 -> text = "/ipns/$hash"
+                3 -> text = "ipns://$hash"
+                else -> {}
+            }
+            var last: Thread? = null
+            setOnMouseClicked { ev -> when(ev.button) {
+                PRIMARY -> when(ev.clickCount){
+                    1 -> last = wait(500){switch()}
+                    2 -> Desktop.getDesktop().browse(URI(url)).also{last?.interrupt()}
+                }
+                SECONDARY -> {
+                    Toolkit.getDefaultToolkit().systemClipboard
+                            .setContents(StringSelection(text), null)
+                    val htext = hint.text
+                    hint.text = "Copied to clipboard"
+                    wait(1000){hint.text = htext}
+                }
+            }}
+        }
+        StackPane().apply {
+            translateY = 40.0
+            maxHeight = 200.0
+            maxWidth = 200.0
+            ImageView(qr(url, 200, 200)).apply {
+                padding = Insets(0.0)
+            }.also { children.add(it) }
+        }.also { children.add(it) }
+    })
+
     var log = TextArea()
     fun console(){
 
@@ -650,7 +855,7 @@ class IPFSManager : Application() {
                 while(i == null) try {i = ipfs.add(wrapper, true)}
                 catch(ex: NullPointerException){}
                 println(i.map { it.hash.toBase58() })
-                i.last().hash.also { info(files, it) }
+                i.last().hash.also { ipfs(files.name, it) }
             }
         }.also { children.add(it) }
         Button("No").apply {
@@ -666,203 +871,174 @@ class IPFSManager : Application() {
                 while(i == null) try {i = ipfs.add(wrapper, false)}
                 catch(ex: NullPointerException){}
                 println(i!!.map { it.hash.toBase58() })
-                i!!.last().hash.also { info(files, it) }
+                i!!.last().hash.also { ipfs(files.name, it) }
             }
         }.also { children.add(it) }
     })}
 
-    val info: (List<File>, Multihash) -> Unit = content@{ files, hash ->
-        dialog(files.name, StackPane().apply{
-            val url = "https://ipfs.io/ipfs/$hash"
-            padding = Insets(32.0)
-            minHeight = 400.0
-            minWidth = 400.0
-            val hint = Label("Double-click to open         Right click to copy").apply {
-                translateY = -130.0
-            }.also { children.add(it) }
-            Label("$hash").apply {
-                cursor = Cursor.HAND
-                translateY = -160.0
-                font = Font.font(20.0)
-                var switch = 1
-                fun switch() = when(switch++%4){
-                    0 -> text = "$hash"
-                    1 -> text = "http://ipfs.io/ipfs/$hash"
-                    2 -> text = "/ipfs/$hash"
-                    3 -> text = "ipfs://$hash"
-                    else -> {}
+    fun ipfs(name: String, hash: Multihash) = dialog(name, StackPane().apply{
+        val url = "https://ipfs.io/ipfs/$hash"
+        padding = Insets(32.0)
+        minHeight = 400.0
+        minWidth = 400.0
+        val hint = Label("Double-click to open         Right click to copy").apply {
+            translateY = -130.0
+        }.also { children.add(it) }
+        Label("$hash").apply {
+            cursor = Cursor.HAND
+            translateY = -160.0
+            font = Font.font(20.0)
+            var switch = 1
+            fun switch() = when(switch++%4){
+                0 -> text = "$hash"
+                1 -> text = "http://ipfs.io/ipfs/$hash"
+                2 -> text = "/ipfs/$hash"
+                3 -> text = "ipfs://$hash"
+                else -> {}
+            }
+            var last: Thread? = null
+            setOnMouseClicked { ev -> when(ev.button) {
+                PRIMARY -> when(ev.clickCount){
+                    1 -> last = wait(500){switch()}
+                    2 -> Desktop.getDesktop().browse(URI(url)).also{last?.interrupt()}
                 }
-                var last: Thread? = null
-                setOnMouseClicked { ev -> when(ev.button) {
-                    PRIMARY -> when(ev.clickCount){
-                        1 -> last = wait(500){switch()}
-                        2 -> Desktop.getDesktop().browse(URI(url)).also{last?.interrupt()}
-                    }
-                    SECONDARY ->  {
-                        Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(text), null)
-                        val txt = hint.text
-                        hint.text = "Copied to clipboard"
-                        wait(1000){hint.text = txt}
-                    }
-                } }
-                setOnDragDetected {
-                    ClipboardContent().apply {
-                        putString(text)
-                        startDragAndDrop(*TransferMode.ANY).setContent(this)
-                    }
+                SECONDARY ->  {
+                    Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(text), null)
+                    val txt = hint.text
+                    hint.text = "Copied to clipboard"
+                    wait(1000){hint.text = txt}
                 }
-            }.also { children.add(it) }
-            Button("Unpin").also{children+=it}.apply {
-                cursor = Cursor.HAND
-                translateY = -90.0
-                translateX = -40.0
-                style = "-fx-background-color: white"
-                var pinned = true
-                setOnAction {
-                    when(pinned){
-                        true -> {
-                            ipfs.pin.rm(hash);
-                            pinned = false
-                            text = "Pin"
-                        }
-                        false -> {
-                            ipfs.pin.add(hash);
-                            pinned = true
-                            text = "Unpin"
-                        }
-                    }
-
+            } }
+            setOnDragDetected {
+                ClipboardContent().apply {
+                    putString(text)
+                    startDragAndDrop(*TransferMode.ANY).setContent(this)
                 }
             }
-            Button("Publish to...").also{children+=it}.apply {
-                cursor = Cursor.HAND
-                translateY = -90.0
-                translateX = 40.0
-                style = "-fx-background-color: white"
-                setOnAction {
-                    dialog(files.name, StackPane().apply dialog@{
-                        minHeight = 150.0
-                        minWidth = 400.0
-                        val txt = Label("Publish to:").apply {
-                            translateY = -40.0
-                            padding = Insets(32.0)
-                            font = Font.font(20.0)
-                        }.also { children.add(it) }
-                        HBox().apply hbox@{
-                            alignment = Pos.CENTER
-                            val box = ComboBox(keys).apply box@{
-                                cursor = Cursor.HAND
-                                style = "-fx-background-color: white"
-                                value = keys[0]
-                                maxWidth = 200.0
-                                selectionModel.selectedItemProperty().addListener { _,_,value ->
-                                    if(value != "Create new key") return@addListener
-                                    dialog(value, HBox().apply dialog@{
-                                        padding = Insets(16.0)
-                                        val id = TextField("")
-                                        val action = {
-                                            this@dialog.cursor = Cursor.WAIT
-                                            async(60,{
-                                                ipfs.key.gen(id.text, Optional.of("rsa"), Optional.of("2048"))
-                                            }, {
-                                                scene.window.hide()
-                                                this@box.selectionModel.select(0)
-                                                this@box.items = keys
-                                            }, {this@dialog.cursor = Cursor.DEFAULT})
-                                        }
-                                        id.apply {
-                                            style = "-fx-background-color: white"
-                                            promptText = "id"
-                                            textProperty().addListener { _,_,new ->
-                                                text = new.replace(Regex("[^a-zA-Z]"), "").toLowerCase()
-                                            }
-                                            setOnAction{action()}
-                                        }.also { children.add(it) }
-                                        Button("Create").apply {
-                                            cursor = Cursor.HAND
-                                            style = "-fx-background-color: white"
-                                            isDefaultButton = true
-                                            setOnAction{action()}
-                                        }.also { children.add(it) }
-                                    })
-                                }
-                            }.also { children.add(it) }
-                            Button("Publish").apply {
-                                cursor = Cursor.HAND
-                                style = "-fx-background-color: white"
-                                isDefaultButton = true
-                                setOnAction {
-                                    this@dialog.cursor = Cursor.WAIT
-                                    this@dialog.children.remove(this@hbox)
-                                    val id = box.value.split(" ")[0]
-
-                                    txt.apply {
-                                        text = "Publishing to $id..."
-                                        translateY = -20.0
-                                    }
-                                    val hint = Label().also{this@dialog.children += it}.apply {
-                                        text = "please wait"
-                                        translateY = 20.0
-                                    }
-
-                                    val task = async(300, {
-                                        ipfs.name.publish(hash, Optional.of(id))["Name"]
-                                    }, { hash ->
-                                        this@dialog.cursor = Cursor.DEFAULT
-                                        val url =
-                                            "https://ipfs.io/ipfs/QmRyeA1xCjreUgbSCc4QLhYzfRnnPGyfQTMuxpf6kUYXoX/#$hash"
-                                        hint.text = "Double-click to open         Right click to copy"
-                                        txt.apply {
-                                            cursor = Cursor.HAND
-                                            var switch = 1
-                                            fun switch() = when(switch++%4){
-                                                0 -> text = "$hash"
-                                                1 -> text = "http://ipfs.io/ipns/$hash"
-                                                2 -> text = "/ipns/$hash"
-                                                3 -> text = "ipns://$hash"
-                                                else -> {}
-                                            }
-                                            var last: Thread? = null
-                                            txt.setOnMouseClicked { ev -> when(ev.button) {
-                                                PRIMARY -> when(ev.clickCount){
-                                                    1 -> last = wait(500){switch()}
-                                                    2 -> Desktop.getDesktop().browse(URI(url)).also{last?.interrupt()}
-                                                }
-                                                SECONDARY -> {
-                                                    Toolkit.getDefaultToolkit().systemClipboard
-                                                            .setContents(StringSelection(text), null)
-                                                    val htext = hint.text
-                                                    hint.text = "Copied to clipboard"
-                                                    wait(1000){hint.text = htext}
-                                                }
-                                            }}
-                                            text = "$hash"
-                                        }
-                                        this@dialog.layout()
-                                    }, {
-                                        this@dialog.cursor = Cursor.DEFAULT
-                                        txt.text = "Error!"
-                                    })
-                                }
-                            }.also { children.add(it) }
-                        }.also { children.add(it) }
-                    })
+        }.also { children.add(it) }
+        Button("Unpin").also{children+=it}.apply {
+            cursor = Cursor.HAND
+            translateY = -90.0
+            translateX = -40.0
+            style = "-fx-background-color: white"
+            var pinned = true
+            setOnAction {
+                when(pinned){
+                    true -> {
+                        ipfs.pin.rm(hash);
+                        pinned = false
+                        text = "Pin"
+                    }
+                    false -> {
+                        ipfs.pin.add(hash);
+                        pinned = true
+                        text = "Unpin"
+                    }
                 }
+
             }
-            StackPane().apply {
-                translateY = 60.0
-                maxHeight = 200.0
-                maxWidth = 200.0
-                ImageView(qr(url, 200, 200)).apply {
-                    padding = Insets(0.0)
-                }.also { children.add(it) }
+        }
+        Button("Publish to...").also{children+=it}.apply {
+            cursor = Cursor.HAND
+            translateY = -90.0
+            translateX = 40.0
+            style = "-fx-background-color: white"
+            setOnAction {
+                dialog(name, StackPane().apply dialog@{
+                    minHeight = 150.0
+                    minWidth = 400.0
+                    val txt = Label("Publish to:").apply {
+                        translateY = -40.0
+                        padding = Insets(32.0)
+                        font = Font.font(20.0)
+                    }.also { children.add(it) }
+                    HBox().apply hbox@{
+                        alignment = Pos.CENTER
+                        val box = ComboBox(keys).apply box@{
+                            cursor = Cursor.HAND
+                            style = "-fx-background-color: white"
+                            value = keys[0]
+                            maxWidth = 200.0
+                            selectionModel.selectedItemProperty().addListener { _,_,value ->
+                                if(value != "Create new key") return@addListener
+                                dialog(value, HBox().apply dialog@{
+                                    padding = Insets(16.0)
+                                    val id = TextField("")
+                                    val action = {
+                                        this@dialog.cursor = Cursor.WAIT
+                                        async(60,{
+                                            ipfs.key.gen(id.text, Optional.of("rsa"), Optional.of("2048"))
+                                        }, {
+                                            scene.window.hide()
+                                            this@box.selectionModel.select(0)
+                                            this@box.items = keys
+                                        }, {this@dialog.cursor = Cursor.DEFAULT})
+                                    }
+                                    id.apply {
+                                        style = "-fx-background-color: white"
+                                        promptText = "id"
+                                        textProperty().addListener { _,_,new ->
+                                            text = new.replace(Regex("[^a-zA-Z]"), "").toLowerCase()
+                                        }
+                                        setOnAction{action()}
+                                    }.also { children.add(it) }
+                                    Button("Create").apply {
+                                        cursor = Cursor.HAND
+                                        style = "-fx-background-color: white"
+                                        isDefaultButton = true
+                                        setOnAction{action()}
+                                    }.also { children.add(it) }
+                                })
+                            }
+                        }.also { children.add(it) }
+                        Button("Publish").apply {
+                            cursor = Cursor.HAND
+                            style = "-fx-background-color: white"
+                            isDefaultButton = true
+                            setOnAction {
+                                this@dialog.cursor = Cursor.WAIT
+                                this@dialog.children.remove(this@hbox)
+                                val id = box.value.split(" ")[0]
+
+                                txt.apply {
+                                    text = "Publishing to $id..."
+                                    translateY = -20.0
+                                }
+                                val hint = Label().also{this@dialog.children += it}.apply {
+                                    text = "please wait"
+                                    translateY = 20.0
+                                }
+
+                                val task = async(300, {
+                                    ipfs.name.publish(hash, Optional.of(id))["Name"]
+                                }, { hash ->
+                                    this@dialog.cursor = Cursor.DEFAULT
+                                    this@dialog.scene.window.hide()
+                                    ipns(id, hash as String);
+                                    this@dialog.layout()
+                                }, {
+                                    this@dialog.cursor = Cursor.DEFAULT
+                                    txt.text = "Error!"
+                                })
+                            }
+                        }.also { children.add(it) }
+                    }.also { children.add(it) }
+                })
+            }
+        }
+        StackPane().apply {
+            translateY = 60.0
+            maxHeight = 200.0
+            maxWidth = 200.0
+            ImageView(qr(url, 200, 200)).apply {
+                padding = Insets(0.0)
             }.also { children.add(it) }
-        });
-    }
+        }.also { children.add(it) }
+    });
 
     fun qr(text: String, width: Int, height: Int) =
         QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, width, height, mapOf(EncodeHintType.MARGIN to 0))
-            .let{MatrixToImageWriter.toBufferedImage(it)}
+            .let{MatrixToImageWriter.toBufferedImage(it, MatrixToImageConfig(0xFF000000.toInt(), 0x00000000))}
             .let{SwingFXUtils.toFXImage(it, null)}
 
     val dialog: (title: String, pane: Pane) -> Unit = { title, pane ->
