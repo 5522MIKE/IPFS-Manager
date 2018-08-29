@@ -143,3 +143,5 @@ When you type "example anything" ("anything" can be anything), it will write the
 - [Gradle](https://gradle.org/)
 
 - [IntelliJ IDEA](https://www.jetbrains.com/idea/)
+
+[![](https://i.imgur.com/aT9BaNV.png)](https://discord.gg/ttVYe8S)
