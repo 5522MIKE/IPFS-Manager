@@ -8,12 +8,12 @@
 </h3>
 
 <hr>
-<p align="center">
-  <a href="#features">Features</a> ♦
-  <a href="#download">Download</a> ♦
-  <a href="#screenshots">Screenshots</a> ♦
+<h3 align="center">
+  <a href="#features">Features</a> •
+  <a href="#download">Download</a> •
+  <a href="#screenshots">Screenshots</a> •
   <a href="#scripting">Scripting</a>
-</p>
+</h3>
 <hr>
 
 
