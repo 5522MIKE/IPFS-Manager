@@ -1,19 +1,20 @@
-<h2 align="center">
+<h3 align="center">
     <img src="https://i.imgur.com/h1fInRb.png"/>
     <br>
     :earth_africa: Download, install, manage, debug your IPFS node :earth_africa:
     <br>
     <br>
     <img src="https://i.imgur.com/CeBlyxM.png"/>
-</h2>
+</h3>
 
+<hr>
 <p align="center">
   <a href="#features">Features</a> ♦
   <a href="#download">Download</a> ♦
   <a href="#screenshots">Screenshots</a> ♦
   <a href="#scripting">Scripting</a>
 </p>
-<h2></h2>
+<hr>
 
 
 ### Features
