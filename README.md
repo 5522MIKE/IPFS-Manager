@@ -2,6 +2,7 @@
     <img src="https://i.imgur.com/h1fInRb.png"/>
     <br>
     :earth_africa: Download, install, manage, debug your IPFS node :earth_africa:
+    <br>
     <img src="https://i.imgur.com/CeBlyxM.png"/>
 </h2>
 
