@@ -12,6 +12,7 @@
   <a href="#download">Download</a> •
   <a href="#features">Features</a> •
   <a href="#screenshots">Screenshots</a> •
+  <a href="#videos">Videos</a> •
   <a href="#scripting">Scripting</a> •
   <a href="#join-us">Join us!</a>
 </h3>
@@ -52,13 +53,12 @@ You need [Java](https://java.com/download/) (It works with Java 8, Java 9 and Ja
 
 ## Videos
 
-[IPFS-Manager #1 : Compiling & Running a script
-](https://youtu.be/A1ljWpe_CS0)
-
 [Roscoe's IPFS: Creating multiple keys](https://www.youtube.com/watch?v=BgVMhwaLg_E)
 
 [Roscoe's IPFS: Connect and share with IPFS-Manager 1.2](https://www.youtube.com/watch?v=CCiGgnRSAN0)
 
+[IPFS-Manager #1 : Compiling & Running a script
+](https://youtu.be/A1ljWpe_CS0)
 
 ## Scripting
 
