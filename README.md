@@ -55,7 +55,10 @@ You need [Java](https://java.com/download/) (It works with Java 8, Java 9 and Ja
 [IPFS-Manager #1 : Compiling & Running a script
 ](https://youtu.be/A1ljWpe_CS0)
 
-[Roscoe's IPFS](https://www.youtube.com/watch?v=CCiGgnRSAN0)
+[Roscoe's IPFS: Creating multiple keys](https://www.youtube.com/watch?v=BgVMhwaLg_E)
+
+[Roscoe's IPFS: Connect and share with IPFS-Manager 1.2](https://www.youtube.com/watch?v=CCiGgnRSAN0)
+
 
 ## Scripting
 
@@ -142,5 +145,5 @@ When you type "example anything" ("anything" can be anything), it will write the
 ## Join us!
 
 <h2 align="center">
-    <a target="_blank" href="https://discord.gg/ttVYe8S"><img src="https://i.imgur.com/aT9BaNV.png"/></a>
+    <a href="https://discord.gg/ttVYe8S"><img src="https://i.imgur.com/aT9BaNV.png"/></a>
 </h2>
