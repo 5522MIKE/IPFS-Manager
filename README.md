@@ -142,5 +142,5 @@ When you type "example anything" ("anything" can be anything), it will write the
 ## Join us!
 
 <h2 align="center">
-    <a href="https://discord.gg/ttVYe8S"><img src="https://i.imgur.com/aT9BaNV.png"/></a>
+    <a target="_blank" href="https://discord.gg/ttVYe8S"><img src="https://i.imgur.com/aT9BaNV.png"/></a>
 </h2>
