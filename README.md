@@ -2,8 +2,7 @@
     <img src="https://i.imgur.com/h1fInRb.png"/>
     <br>
     :earth_africa: Download, install, manage, debug your IPFS node :earth_africa:
-    <br>
-    <br>
+    <img src="https://i.imgur.com/CeBlyxM.png"/>
 </h2>
 
 <p align="center">
@@ -13,6 +12,7 @@
   <a href="#scripting">Scripting</a>
 </p>
 <h2></h2>
+
 
 ### Features
 
@@ -144,4 +144,6 @@ When you type "example anything" ("anything" can be anything), it will write the
 
 - [IntelliJ IDEA](https://www.jetbrains.com/idea/)
 
-[![](https://i.imgur.com/aT9BaNV.png)](https://discord.gg/ttVYe8S)
+<h2 align="center">
+    <a href="https://discord.gg/ttVYe8S"><img src="https://i.imgur.com/aT9BaNV.png"/></a>
+</h2>
