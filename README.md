@@ -3,6 +3,7 @@
     <br>
     :earth_africa: Download, install, manage, debug your IPFS node :earth_africa:
     <br>
+    <br>
     <img src="https://i.imgur.com/CeBlyxM.png"/>
 </h2>
 
