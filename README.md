@@ -9,43 +9,15 @@
 
 <hr>
 <h3 align="center">
-  <a href="#features">Features</a> •
   <a href="#download">Download</a> •
+  <a href="#features">Features</a> •
   <a href="#screenshots">Screenshots</a> •
-  <a href="#scripting">Scripting</a>
+  <a href="#scripting">Scripting</a> •
+  <a href="#join-us">Join us!</a>
 </h3>
 <hr>
 
-
-### Features
-
-- Automatically downloads go-ipfs
-
-- Can connect to an already running IPFS node
-
-- Can start a new IPFS node
-
-- Supports all IPFS actions
-
-- Command-Line and Graphical interfaces
-
-- You can create scripts and tasks in Kotlin
-
-- Modify your IPFS configuration
-
-- Drag and drop files
-
-- Publish to IPNS
-
-- Manage keys
-
-- Manage pins
-
-- Generates QR codes
-
-- Clear & Minimalist UI
-
-### Download
+## Download
 
 You need [Java](https://java.com/download/) (It works with Java 8, Java 9 and Java 10)
 
@@ -53,19 +25,39 @@ You need [Java](https://java.com/download/) (It works with Java 8, Java 9 and Ja
 
 - [Linux, MacOS, Freebsd](https://github.com/RHazDev/IPFS-Manager/raw/master/jar/ipfs-manager-1.2.14.jar)
 
-### Screenshots
+## Features
+
+- It can start a new IPFS node or connect to an already running IPFS node
+
+- You can use multiple IPFS repositories and manage them without actually start them
+
+- It supports all IPFS actions with Command-Line or Graphical interfaces
+
+- You can modify your node configuration
+
+- You can create scripts and tasks in Kotlin
+
+- You can drag and drop files and hashes
+
+- You can manage keys and pins
+
+- It generates QR codes
+
+- It has a Clear & Minimalist design
+
+## Screenshots
 ![](https://i.imgur.com/AJ0Ge3b.png)
 ![](https://i.imgur.com/U2LdSW8.png)
 ![](https://i.imgur.com/SV6aHm3.png)
 
-### Videos
+## Videos
 
 [IPFS-Manager #1 : Compiling & Running a script
 ](https://youtu.be/A1ljWpe_CS0)
 
 [Roscoe's IPFS](https://www.youtube.com/watch?v=CCiGgnRSAN0)
 
-### Scripting
+## Scripting
 
 Scripts and tasks are written in Kotlin, an awesome programming language for manipulating nullable objects, callbacks, and types.
 
@@ -127,7 +119,7 @@ When you type "example" (its name), it writes the IPFS version
 
 When you type "example anything" ("anything" can be anything), it will write the IPFS version followed by what you wrote
 
-### This app is built with the help of
+## This app is built with the help of
 
 - [IPFS-Daemon](https://github.com/RHazDev/IPFS-Daemon)
 
@@ -146,6 +138,8 @@ When you type "example anything" ("anything" can be anything), it will write the
 - [Gradle](https://gradle.org/)
 
 - [IntelliJ IDEA](https://www.jetbrains.com/idea/)
+
+## Join us!
 
 <h2 align="center">
     <a href="https://discord.gg/ttVYe8S"><img src="https://i.imgur.com/aT9BaNV.png"/></a>
