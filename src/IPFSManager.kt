@@ -15,6 +15,7 @@ import io.ipfs.api.IPFS.PinType.*
 import io.ipfs.api.MerkleNode
 import io.ipfs.api.NamedStreamable
 import io.ipfs.api.NamedStreamable.*
+import io.ipfs.multiaddr.MultiAddress
 import io.ipfs.multihash.Multihash
 import javafx.animation.FadeTransition
 import javafx.application.Application
@@ -215,11 +216,8 @@ class IPFSManager : Application() {
                 if(msg == "Daemon is ready")
                     return@here Platform.runLater {checkStore()}
 
-                if(msg == "ipfs: Reading from /dev/stdin; send Ctrl-z to stop.") {
-                    process.destroy()
-                    log.append("IPFS Manager: Please specify arguments")
+                if(msg.contains("already have connection to peer"))
                     return@here
-                }
 
                 Platform.runLater { log.append(msg) }
             }
@@ -453,15 +451,194 @@ class IPFSManager : Application() {
                     }
                 })
             }
-            MenuItem("Pub/Sub").also{items.add(it)}.setOnAction{notimpl()}
+            Menu("Pub/Sub").also{items.add(it)}.apply{
+                MenuItem("Publish...").also{items.add(it)}.setOnAction{
+                    dialog("Publish", VBox().apply{
+                        padding = Insets(16.0)
+                        val action: (String, String) -> Unit = { topic, data ->
+                            ipfs.pubsub.pub(topic, data)
+                            scene.window.hide()
+                        }
+                        val topic = TextField("").apply {
+                            minWidth = 300.0
+                            style = "-fx-background-color: white"
+                            promptText = "sunflowers"
+                        }.also { children.add(it) }
+                        val data = TextField("").apply {
+                            minWidth = 300.0
+                            style = "-fx-background-color: white"
+                            promptText = "hello world"
+                        }.also { children.add(it) }
+                        Button("Publish").apply {
+                            cursor = Cursor.HAND
+                            style = "-fx-background-color: white"
+                            setOnAction {action(topic.text, data.text)}
+                        }.also { children.add(it) }
+                        requestFocus()
+                    })
+                }
+                MenuItem("Subscribe...").also{items.add(it)}.setOnAction{
+                    dialog("Subscribe", HBox().apply {
+                        padding = Insets(16.0)
+                        val action: (String) -> Unit = { topic ->
+                            ipfs.pubsub.sub(topic)
+                            scene.window.hide()
+                        }
+                        val topic = TextField("").apply {
+                            minWidth = 300.0
+                            style = "-fx-background-color: white"
+                            promptText = "sunflowers"
+                        }.also { children.add(it) }
+                        Button("Subscribe").apply {
+                            cursor = Cursor.HAND
+                            style = "-fx-background-color: white"
+                            setOnAction {action(topic.text)}
+                        }.also { children.add(it) }
+                        requestFocus()
+                    })
+                }
+            }
             Menu("Swarm").also{items.add(it)}.apply {
-                MenuItem("Connect to...").also{items.add(it)}.setOnAction{notimpl()}
-                MenuItem("Disconnect from...").also{items.add(it)}.setOnAction{notimpl()}
+                MenuItem("Connect to...").also{items.add(it)}.setOnAction{
+                    dialog("Connect to...", HBox().apply {
+                        padding = Insets(16.0)
+                        val action: (String) -> Unit = { text ->
+                            ipfs.swarm.connect(text)
+                            scene.window.hide()
+                        }
+                        val input = TextField("").apply {
+                            minWidth = 300.0
+                            style = "-fx-background-color: white"
+                            promptText = "Multi address"
+                        }.also { children.add(it) }
+                        Button("Connect").apply {
+                            cursor = Cursor.HAND
+                            style = "-fx-background-color: white"
+                            setOnAction {action(input.text)}
+                        }.also { children.add(it) }
+                        requestFocus()
+                    })
+                }
+                MenuItem("Disconnect from...").also{items.add(it)}.setOnAction{
+                    dialog("Disconnect from...", HBox().apply {
+                        padding = Insets(16.0)
+                        val action: (String) -> Unit = { text ->
+                            ipfs.swarm.disconnect(text)
+                            scene.window.hide()
+                        }
+                        val input = TextField("").apply {
+                            minWidth = 300.0
+                            style = "-fx-background-color: white"
+                            promptText = "Multi address"
+                        }.also { children.add(it) }
+                        Button("Disconnect").apply {
+                            cursor = Cursor.HAND
+                            style = "-fx-background-color: white"
+                            setOnAction {action(input.text)}
+                        }.also { children.add(it) }
+                        requestFocus()
+                    })
+                }
             }
             Menu("DHT").also{items.add(it)}.apply {
-                MenuItem("Find peer...").also{items.add(it)}.setOnAction{notimpl()}
-                MenuItem("Find provs...").also{items.add(it)}.setOnAction{notimpl()}
-                MenuItem("Query...").also{items.add(it)}.setOnAction{notimpl()}
+                MenuItem("Find peer...").also{items.add(it)}.setOnAction{
+                    val title = "Find peer"
+                    dialog(title, HBox().apply {
+                        padding = Insets(16.0)
+                        val action: (String) -> Unit = { input ->
+                            val loading = minidialog(title, "Finding peer...")
+                            async(60, {((
+                                ipfs.dht.findpeer(Multihash.fromBase58(input))
+                                ?.get("Responses") as? List<*>)
+                                ?.get(0) as? Map<*,*>)
+                                ?.get("Addrs")},
+                                    { result ->
+                                        loading.close()
+                                        val list = (result as List<*>).map{it.toString()}
+                                        listdialog(title, input, list, true)
+                                    },
+                                    {
+                                        loading.close()
+                                        minidialog(title, "Could not find peer")
+                                    }
+                            )
+                        }
+                        val input = TextField("").apply {
+                            minWidth = 300.0
+                            style = "-fx-background-color: white"
+                            promptText = "PeerID (Qm...)"
+                            setOnAction {action(text)}
+                        }.also { children.add(it) }
+                        Button("Apply").apply {
+                            cursor = Cursor.HAND
+                            style = "-fx-background-color: white"
+                            setOnAction {action(input.text)}
+                        }.also { children.add(it) }
+                        requestFocus()
+                    })
+                }
+                MenuItem("Find providers...").also{items.add(it)}.setOnAction{
+                    val title = "Find providers"
+                    dialog(title, HBox().apply {
+                        padding = Insets(16.0)
+                        val action: (String) -> Unit = { text ->
+                            scene.window.hide()
+                            val loading = minidialog(title, "Querying...")
+                            async(60, {ipfs.dht.findprovs(Multihash.fromBase58(text))},
+                                { result ->
+                                    loading.close()
+                                    minidialog(title, result.toString())
+                                }, {
+                                    loading.close()
+                                    minidialog(title, "Could not find providers")
+                                }
+                            )
+                        }
+                        val input = TextField("").apply {
+                            minWidth = 300.0
+                            style = "-fx-background-color: white"
+                            promptText = "Content hash (Qm...)"
+                            setOnAction {action(text)}
+                        }.also { children.add(it) }
+                        Button("Apply").apply {
+                            cursor = Cursor.HAND
+                            style = "-fx-background-color: white"
+                            setOnAction {action(input.text)}
+                        }.also { children.add(it) }
+                        requestFocus()
+                    })
+                }
+                MenuItem("Query peer...").also{items.add(it)}.setOnAction{
+                    val title = "Query peer"
+                    dialog(title, HBox().apply {
+                        padding = Insets(16.0)
+                        val action: (String) -> Unit = { text ->
+                            scene.window.hide()
+                            val loading = minidialog(title, "Querying...")
+                            async(60, {ipfs.dht.query(Multihash.fromBase58(text))},
+                                { result ->
+                                    loading.close()
+                                    minidialog(title, result.toString())
+                                }, {
+                                    loading.close()
+                                    minidialog(title, "Could not query peer")
+                                }
+                            )
+                        }
+                        val input = TextField("").apply {
+                            minWidth = 300.0
+                            style = "-fx-background-color: white"
+                            promptText = "PeerID (Qm...)"
+                            setOnAction {action(text)}
+                        }.also { children.add(it) }
+                        Button("Apply").apply {
+                            cursor = Cursor.HAND
+                            style = "-fx-background-color: white"
+                            setOnAction {action(input.text)}
+                        }.also { children.add(it) }
+                        requestFocus()
+                    })
+                }
             }
         }
         Menu("Info").also{menus.add(it)}.apply {
@@ -501,7 +678,10 @@ class IPFSManager : Application() {
                     })
                 }
             }
-            MenuItem("Peers").also{items.add(it)}.setOnAction{notimpl()}
+            MenuItem("Peers").also{items.add(it)}.setOnAction{
+                val peers = ipfs.swarm.peers()
+                listdialog("Peers", "${peers.size} peers", peers.map{"${it.id}: ${it.address}"}, false)
+            }
             MenuItem("Others").also{items.add(it)}.setOnAction {
                 dialog("Info", VBox().apply {
                     padding = Insets(16.0)
@@ -738,6 +918,41 @@ class IPFSManager : Application() {
         }
     }
 
+    fun minidialog(title: String, message: String) = dialog(title, StackPane().apply {
+        padding = Insets(16.0)
+        minWidth = 300.0
+        Label(message).also{children+=it}
+    })
+
+    fun listdialog(title: String, subtitle: String, list: List<String>, writable: Boolean) =
+        dialog(title, BorderPane().apply {
+            minHeight = 500.0
+            minWidth = 800.0
+            top = StackPane().apply {
+                padding = Insets(16.0, 16.0, 0.0, 16.0)
+                Label(subtitle).also{children.add(it)}.apply {
+                    font = Font.font(20.0)
+                }
+            }
+            val area = TextArea().apply {
+                padding = Insets(16.0, 16.0, 16.0, 16.0)
+                style = "-fx-background-color: transparent; -fx-background-insets: 0px"
+                background = Background.EMPTY
+                isWrapText = false
+                isEditable = false
+                text = list.joinToString("\n")
+            }
+            center = area
+            bottom = StackPane().apply {
+                padding = Insets(0.0, 16.0, 16.0, 16.0)
+                Button("Close").also{children.add(it)}.apply {
+                    cursor = Cursor.HAND
+                    style = "-fx-background-color: white"
+                    setOnAction { scene.window.hide() }
+                }
+            }
+        });
+
     fun ipns(id: String, hash: String) = dialog(id, StackPane().apply {
         val url = "https://ipfs.io/ipfs/QmRyeA1xCjreUgbSCc4QLhYzfRnnPGyfQTMuxpf6kUYXoX/#$hash"
         padding = Insets(32.0)
@@ -854,7 +1069,6 @@ class IPFSManager : Application() {
                 var i: List<MerkleNode>? = null
                 while(i == null) try {i = ipfs.add(wrapper, true)}
                 catch(ex: NullPointerException){}
-                println(i.map { it.hash.toBase58() })
                 i.last().hash.also { ipfs(files.name, it) }
             }
         }.also { children.add(it) }
@@ -870,7 +1084,6 @@ class IPFSManager : Application() {
                 var i: List<MerkleNode>? = null
                 while(i == null) try {i = ipfs.add(wrapper, false)}
                 catch(ex: NullPointerException){}
-                println(i!!.map { it.hash.toBase58() })
                 i!!.last().hash.also { ipfs(files.name, it) }
             }
         }.also { children.add(it) }
@@ -1041,18 +1254,13 @@ class IPFSManager : Application() {
             .let{MatrixToImageWriter.toBufferedImage(it, MatrixToImageConfig(0xFF000000.toInt(), 0x00000000))}
             .let{SwingFXUtils.toFXImage(it, null)}
 
-    val dialog: (title: String, pane: Pane) -> Unit = { title, pane ->
-
-        val dialog = Stage()
-
-        dialog.apply {
-            icons.add(Image(icon))
-            this.title = title
-            isAlwaysOnTop = true
-            initModality(Modality.WINDOW_MODAL)
-            scene = Scene(pane).apply { stylesheets.add(stylesheet) }
-            show()
-        }
+    fun dialog(title: String, pane: Pane) = Stage().apply {
+        icons.add(Image(icon))
+        this.title = title
+        isAlwaysOnTop = true
+        initModality(Modality.WINDOW_MODAL)
+        scene = Scene(pane).apply { stylesheets.add(stylesheet) }
+        show()
     }
 
 }
