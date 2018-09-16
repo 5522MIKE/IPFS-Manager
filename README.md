@@ -145,5 +145,6 @@ When you type "example anything" ("anything" can be anything), it will write the
 ## Join us!
 
 <h2 align="center">
+    <a href="https://steemit.com/ipfs/@hazae41/sweet-ipfs-full-ipfs-node-for-android"><img src="https://steemitimages.com/DQmUGojp38u9sSMvPhXTqHGC1TqbG9ixDAb6gAKSdRhMuaR/steemit%20(1).png"/></a>
     <a href="https://discord.gg/ttVYe8S"><img src="https://i.imgur.com/aT9BaNV.png"/></a>
 </h2>
