@@ -63,6 +63,8 @@ import javax.imageio.ImageIO
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TableView.*
+import javafx.stage.FileChooser.*
+import java.awt.datatransfer.DataFlavor
 
 fun main(args: Array<String>) {
     Application.launch(IPFSManager::class.java, *args)
@@ -290,6 +292,25 @@ class IPFSManager : Application() {
         })}
         style = "-fx-background-color: transparent"
         Menu("Action").also{menus.add(it)}.apply{
+            MenuItem("Open from clipboard").also{items+=it}.setOnAction {
+                val txt = try {
+                    Toolkit.getDefaultToolkit()
+                        .systemClipboard.getData(DataFlavor.stringFlavor) as String
+                }catch(ex:Exception){null}
+                txt?.also { txt -> Multihash.fromBase58(txt)?.let{ipfs(txt, it)}} ?: {
+                    minidialog(txt ?: "Cipboard", "Could not find hash, copy a valid base58 hash and try-again")
+                }()
+            }
+            MenuItem("Open file...").also{items+=it}.setOnAction {
+                FileChooser().run {
+                    extensionFilters+=ExtensionFilter("IPFS file", "*.ipfs")
+                    showOpenDialog(window)
+                }?.apply {
+                    Multihash.fromBase58(readText())?.let { ipfs(name, it) } ?: {
+                        minidialog(name, "Could not find hash, ensure the file has been exported by this software")
+                    }()
+                }
+            }
             MenuItem("Add files...").also{items.add(it)}.setOnAction{
                 FileChooser().showOpenMultipleDialog(window).let(open)
             }
@@ -921,7 +942,7 @@ class IPFSManager : Application() {
     fun minidialog(title: String, message: String) = dialog(title, StackPane().apply {
         padding = Insets(16.0)
         minWidth = 300.0
-        Label(message).also{children+=it}
+        TextField(message).also{children+=it}
     })
 
     fun listdialog(title: String, subtitle: String, list: List<String>, writable: Boolean) =
@@ -1097,7 +1118,7 @@ class IPFSManager : Application() {
         val hint = Label("Double-click to open         Right click to copy").apply {
             translateY = -130.0
         }.also { children.add(it) }
-        Label("$hash").apply {
+        Label("$hash").also{children+=it}.apply {
             cursor = Cursor.HAND
             translateY = -160.0
             font = Font.font(20.0)
@@ -1110,133 +1131,149 @@ class IPFSManager : Application() {
                 else -> {}
             }
             var last: Thread? = null
-            setOnMouseClicked { ev -> when(ev.button) {
-                PRIMARY -> when(ev.clickCount){
-                    1 -> last = wait(500){switch()}
-                    2 -> Desktop.getDesktop().browse(URI(url)).also{last?.interrupt()}
+            setOnMouseClicked { ev ->
+                when(ev.button) {
+                    PRIMARY -> when(ev.clickCount){
+                        1 -> last = wait(500){switch()}
+                        2 -> Desktop.getDesktop().browse(URI(url)).also{last?.interrupt()}
+                    }
+                    SECONDARY ->  {
+                        Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(text), null)
+                        val txt = hint.text
+                        hint.text = "Copied to clipboard"
+                        wait(1000){hint.text = txt}
+                    }
                 }
-                SECONDARY ->  {
-                    Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(text), null)
-                    val txt = hint.text
-                    hint.text = "Copied to clipboard"
-                    wait(1000){hint.text = txt}
-                }
-            } }
+            }
             setOnDragDetected {
                 ClipboardContent().apply {
                     putString(text)
                     startDragAndDrop(*TransferMode.ANY).setContent(this)
                 }
             }
-        }.also { children.add(it) }
-        Button("Unpin").also{children+=it}.apply {
-            cursor = Cursor.HAND
+        }
+        HBox(5.0).also{children+=it}.apply{
+            alignment = Pos.CENTER;
             translateY = -90.0
-            translateX = -40.0
-            style = "-fx-background-color: white"
-            var pinned = true
-            setOnAction {
-                when(pinned){
-                    true -> {
-                        ipfs.pin.rm(hash);
-                        pinned = false
-                        text = "Pin"
+            isPickOnBounds = false
+            Button("Unpin").also{children+=it}.apply {
+                cursor = Cursor.HAND
+                style = "-fx-background-color: white"
+                var pinned = true
+                setOnAction {
+                    when(pinned){
+                        true -> {
+                            ipfs.pin.rm(hash);
+                            pinned = false
+                            text = "Pin"
+                        }
+                        false -> {
+                            ipfs.pin.add(hash);
+                            pinned = true
+                            text = "Unpin"
+                        }
                     }
-                    false -> {
-                        ipfs.pin.add(hash);
-                        pinned = true
-                        text = "Unpin"
+
+                }
+            }
+            Button("Publish to...").also{children+=it}.apply {
+                cursor = Cursor.HAND
+                style = "-fx-background-color: white"
+                setOnAction {
+                    dialog(name, StackPane().apply dialog@{
+                        minHeight = 150.0
+                        minWidth = 400.0
+                        val txt = Label("Publish to:").apply {
+                            translateY = -40.0
+                            padding = Insets(32.0)
+                            font = Font.font(20.0)
+                        }.also { children.add(it) }
+                        HBox().apply hbox@{
+                            alignment = Pos.CENTER
+                            val box = ComboBox(keys).apply box@{
+                                cursor = Cursor.HAND
+                                style = "-fx-background-color: white"
+                                value = keys[0]
+                                maxWidth = 200.0
+                                selectionModel.selectedItemProperty().addListener { _,_,value ->
+                                    if(value != "Create new key") return@addListener
+                                    dialog(value, HBox().apply dialog@{
+                                        padding = Insets(16.0)
+                                        val id = TextField("")
+                                        val action = {
+                                            this@dialog.cursor = Cursor.WAIT
+                                            async(60,{
+                                                ipfs.key.gen(id.text, Optional.of("rsa"), Optional.of("2048"))
+                                            }, {
+                                                scene.window.hide()
+                                                this@box.selectionModel.select(0)
+                                                this@box.items = keys
+                                            }, {this@dialog.cursor = Cursor.DEFAULT})
+                                        }
+                                        id.apply {
+                                            style = "-fx-background-color: white"
+                                            promptText = "id"
+                                            textProperty().addListener { _,_,new ->
+                                                text = new.replace(Regex("[^a-zA-Z]"), "").toLowerCase()
+                                            }
+                                            setOnAction{action()}
+                                        }.also { children.add(it) }
+                                        Button("Create").apply {
+                                            cursor = Cursor.HAND
+                                            style = "-fx-background-color: white"
+                                            isDefaultButton = true
+                                            setOnAction{action()}
+                                        }.also { children.add(it) }
+                                    })
+                                }
+                            }.also { children.add(it) }
+                            Button("Publish").apply {
+                                cursor = Cursor.HAND
+                                style = "-fx-background-color: white"
+                                isDefaultButton = true
+                                setOnAction {
+                                    this@dialog.cursor = Cursor.WAIT
+                                    this@dialog.children.remove(this@hbox)
+                                    val id = box.value.split(" ")[0]
+
+                                    txt.apply {
+                                        text = "Publishing to $id..."
+                                        translateY = -20.0
+                                    }
+                                    val hint = Label().also{this@dialog.children += it}.apply {
+                                        text = "please wait"
+                                        translateY = 20.0
+                                    }
+
+                                    val task = async(300, {
+                                        ipfs.name.publish(hash, Optional.of(id))["Name"]
+                                    }, { hash ->
+                                        this@dialog.cursor = Cursor.DEFAULT
+                                        this@dialog.scene.window.hide()
+                                        ipns(id, hash as String);
+                                        this@dialog.layout()
+                                    }, {
+                                        this@dialog.cursor = Cursor.DEFAULT
+                                        txt.text = "Error!"
+                                    })
+                                }
+                            }.also { children.add(it) }
+                        }.also { children.add(it) }
+                    })
+                }
+            }
+            Button("Export to .ipfs").also{children+=it}.apply{
+                cursor = Cursor.HAND
+                style = "-fx-background-color: white"
+                setOnAction {
+                    FileChooser().run {
+                        extensionFilters+=ExtensionFilter("IPFS file", "*.ipfs")
+                        showSaveDialog(window)
+                    }?.apply {
+                        createNewFile()
+                        writeText(hash.toBase58())
                     }
                 }
-
-            }
-        }
-        Button("Publish to...").also{children+=it}.apply {
-            cursor = Cursor.HAND
-            translateY = -90.0
-            translateX = 40.0
-            style = "-fx-background-color: white"
-            setOnAction {
-                dialog(name, StackPane().apply dialog@{
-                    minHeight = 150.0
-                    minWidth = 400.0
-                    val txt = Label("Publish to:").apply {
-                        translateY = -40.0
-                        padding = Insets(32.0)
-                        font = Font.font(20.0)
-                    }.also { children.add(it) }
-                    HBox().apply hbox@{
-                        alignment = Pos.CENTER
-                        val box = ComboBox(keys).apply box@{
-                            cursor = Cursor.HAND
-                            style = "-fx-background-color: white"
-                            value = keys[0]
-                            maxWidth = 200.0
-                            selectionModel.selectedItemProperty().addListener { _,_,value ->
-                                if(value != "Create new key") return@addListener
-                                dialog(value, HBox().apply dialog@{
-                                    padding = Insets(16.0)
-                                    val id = TextField("")
-                                    val action = {
-                                        this@dialog.cursor = Cursor.WAIT
-                                        async(60,{
-                                            ipfs.key.gen(id.text, Optional.of("rsa"), Optional.of("2048"))
-                                        }, {
-                                            scene.window.hide()
-                                            this@box.selectionModel.select(0)
-                                            this@box.items = keys
-                                        }, {this@dialog.cursor = Cursor.DEFAULT})
-                                    }
-                                    id.apply {
-                                        style = "-fx-background-color: white"
-                                        promptText = "id"
-                                        textProperty().addListener { _,_,new ->
-                                            text = new.replace(Regex("[^a-zA-Z]"), "").toLowerCase()
-                                        }
-                                        setOnAction{action()}
-                                    }.also { children.add(it) }
-                                    Button("Create").apply {
-                                        cursor = Cursor.HAND
-                                        style = "-fx-background-color: white"
-                                        isDefaultButton = true
-                                        setOnAction{action()}
-                                    }.also { children.add(it) }
-                                })
-                            }
-                        }.also { children.add(it) }
-                        Button("Publish").apply {
-                            cursor = Cursor.HAND
-                            style = "-fx-background-color: white"
-                            isDefaultButton = true
-                            setOnAction {
-                                this@dialog.cursor = Cursor.WAIT
-                                this@dialog.children.remove(this@hbox)
-                                val id = box.value.split(" ")[0]
-
-                                txt.apply {
-                                    text = "Publishing to $id..."
-                                    translateY = -20.0
-                                }
-                                val hint = Label().also{this@dialog.children += it}.apply {
-                                    text = "please wait"
-                                    translateY = 20.0
-                                }
-
-                                val task = async(300, {
-                                    ipfs.name.publish(hash, Optional.of(id))["Name"]
-                                }, { hash ->
-                                    this@dialog.cursor = Cursor.DEFAULT
-                                    this@dialog.scene.window.hide()
-                                    ipns(id, hash as String);
-                                    this@dialog.layout()
-                                }, {
-                                    this@dialog.cursor = Cursor.DEFAULT
-                                    txt.text = "Error!"
-                                })
-                            }
-                        }.also { children.add(it) }
-                    }.also { children.add(it) }
-                })
             }
         }
         StackPane().apply {
