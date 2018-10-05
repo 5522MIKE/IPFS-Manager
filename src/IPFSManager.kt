@@ -3,21 +3,17 @@
 package fr.rhaz.ipfs
 
 import com.google.gson.*
-import com.google.gson.stream.JsonWriter
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.client.j2se.MatrixToImageConfig
 import com.google.zxing.client.j2se.MatrixToImageWriter
 import com.google.zxing.qrcode.QRCodeWriter
-import com.sun.java.accessibility.util.AWTEventMonitor.addActionListener
 import io.ipfs.api.IPFS
-import io.ipfs.api.IPFS.PinType.*
+import io.ipfs.api.IPFS.PinType.recursive
 import io.ipfs.api.MerkleNode
-import io.ipfs.api.NamedStreamable
-import io.ipfs.api.NamedStreamable.*
-import io.ipfs.multiaddr.MultiAddress
+import io.ipfs.api.NamedStreamable.DirWrapper
+import io.ipfs.api.NamedStreamable.FileWrapper
 import io.ipfs.multihash.Multihash
-import javafx.animation.FadeTransition
 import javafx.application.Application
 import javafx.application.Platform
 import javafx.beans.property.ReadOnlyObjectWrapper
@@ -34,6 +30,7 @@ import javafx.scene.control.Label
 import javafx.scene.control.Menu
 import javafx.scene.control.MenuBar
 import javafx.scene.control.MenuItem
+import javafx.scene.control.TableView.CONSTRAINED_RESIZE_POLICY
 import javafx.scene.control.TextArea
 import javafx.scene.control.TextField
 import javafx.scene.image.Image
@@ -45,26 +42,22 @@ import javafx.scene.input.TransferMode
 import javafx.scene.layout.*
 import javafx.scene.text.Font
 import javafx.stage.*
-import javafx.util.Duration
+import javafx.stage.FileChooser.ExtensionFilter
 import java.awt.*
-import java.awt.MenuItem as AWTMenuItem
+import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.StringSelection
 import java.awt.event.ActionListener
 import java.io.File
 import java.io.FileReader
-import java.io.FileWriter
 import java.io.InputStreamReader
+import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
 import java.net.URLClassLoader
 import java.nio.file.Files
 import java.util.*
 import javax.imageio.ImageIO
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
-import javafx.scene.control.TableView.*
-import javafx.stage.FileChooser.*
-import java.awt.datatransfer.DataFlavor
+import java.awt.MenuItem as AWTMenuItem
 
 fun main(args: Array<String>) {
     Application.launch(IPFSManager::class.java, *args)
@@ -334,6 +327,17 @@ class IPFSManager : Application() {
                         columnResizePolicy = CONSTRAINED_RESIZE_POLICY
                         TableColumn<Multihash, String>("Hash").also{columns+=it}.apply {
                             setCellValueFactory { ReadOnlyObjectWrapper(it.value.toBase58()) }
+                        }
+                        TableColumn<Multihash, String>("Content").also{columns+=it}.apply{
+                            setCellValueFactory{
+                                (URL("http://127.0.0.1:8080/ipfs/${it.value}")
+                                    .openConnection() as HttpURLConnection)
+                                .run {
+                                    requestMethod = "HEAD"
+                                    connect()
+                                    ReadOnlyObjectWrapper(contentType?.split(";")?.get(0))
+                                }
+                            }
                         }
                         setRowFactory {
                             TableRow<Multihash>().apply {
