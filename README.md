@@ -7,7 +7,6 @@
     <img src="https://i.imgur.com/CeBlyxM.png"/>
 </h3>
 
-[![](https://i.imgur.com/dhxagpE.png)](https://steemit.com/ipfs/@hazae41/sweet-ipfs-full-ipfs-node-for-android#upvote_button)
 [![](https://i.imgur.com/iolftLK.png)](https://github.com/RHazDev/IPFS-Manager)
 
 <hr>
